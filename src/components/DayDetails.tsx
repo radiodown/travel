@@ -4,6 +4,11 @@ type Props = {
   day: ItineraryDay;
 };
 
+function getEventDescription(description?: string, note?: string) {
+  const parts = [description?.trim(), note?.trim()].filter((value): value is string => !!value);
+  return [...new Set(parts)].join(' · ');
+}
+
 export default function DayDetails({ day }: Props) {
   return (
     <div className="day-details">
@@ -16,17 +21,20 @@ export default function DayDetails({ day }: Props) {
         </div>
 
         <div className="event-list">
-          {day.events.map((event, index) => (
-            <article key={`${event.title}-${index}`} className="event-card">
-              {event.time && <span className="event-time">{event.time}</span>}
-              <div>
-                <h4>{event.title}</h4>
-                {event.location && <p className="event-location">{event.location}</p>}
-                {event.description && <p>{event.description}</p>}
-                {event.note && <p className="event-note">{event.note}</p>}
-              </div>
-            </article>
-          ))}
+          {day.events.map((event, index) => {
+            const eventDescription = getEventDescription(event.description, event.note);
+
+            return (
+              <article key={`${event.title}-${index}`} className="event-card">
+                {event.time && <span className="event-time">{event.time}</span>}
+                <div>
+                  <h4>{event.title}</h4>
+                  {event.location && <p className="event-location">{event.location}</p>}
+                  {eventDescription && <p>{eventDescription}</p>}
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
 

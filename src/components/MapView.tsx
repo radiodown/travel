@@ -1,23 +1,22 @@
 import { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import {
+  APIProvider,
+  Map,
+  AdvancedMarker,
+  useMap,
+} from '@vis.gl/react-google-maps';
 import type { ItineraryEvent } from '../data/itinerary';
+import { CATEGORIES } from '../data/categories';
 
-function createPin(number: number, active: boolean) {
-  return L.divIcon({
-    html: `<div class="map-pin${active ? ' map-pin--active' : ''}"><span>${number}</span></div>`,
-    className: '',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -20],
-  });
-}
+const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
-function FlyTo({ center }: { center: [number, number] }) {
+function PanTo({ center, zoom }: { center: { lat: number; lng: number }; zoom: number }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo(center, 14, { duration: 0.7 });
-  }, [center, map]);
+    if (!map) return;
+    map.panTo(center);
+    map.setZoom(zoom);
+  }, [center, zoom, map]);
   return null;
 }
 
@@ -32,39 +31,67 @@ export default function MapView({ events, selectedIndex, onSelectEvent }: Props)
     .map((e, i) => ({ event: e, origIndex: i }))
     .filter(({ event }) => !!event.coordinates);
 
-  const defaultCenter: [number, number] =
-    mapped.length > 0 ? mapped[0].event.coordinates! : [50.0755, 14.4378];
+  const defaultCenter = mapped.length > 0
+    ? { lat: mapped[0].event.coordinates![0], lng: mapped[0].event.coordinates![1] }
+    : { lat: 50.0755, lng: 14.4378 };
 
-  const flyTarget: [number, number] =
+  const selectedCoord =
     selectedIndex !== null && events[selectedIndex]?.coordinates
       ? events[selectedIndex].coordinates!
-      : defaultCenter;
+      : null;
+
+  const panTarget = selectedCoord
+    ? { lat: selectedCoord[0], lng: selectedCoord[1] }
+    : defaultCenter;
+
+  // Closer zoom when a place is selected, wider overview otherwise
+  const panZoom = selectedCoord ? 17 : 13;
+
+  if (!API_KEY) {
+    return (
+      <div className="map-no-key">
+        <p className="map-no-key-title">🗺️ Google Maps API 키가 필요합니다</p>
+        <p className="map-no-key-desc">
+          프로젝트 루트의 <code>.env</code> 파일에 아래처럼 키를 추가한 뒤
+          개발 서버를 재시작하세요.
+        </p>
+        <pre className="map-no-key-code">VITE_GOOGLE_MAPS_API_KEY=발급받은_키</pre>
+      </div>
+    );
+  }
 
   return (
-    <MapContainer
-      center={defaultCenter}
-      zoom={13}
-      style={{ height: '100%', width: '100%' }}
-      zoomControl={true}
-    >
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-      />
-      <FlyTo center={flyTarget} />
-      {mapped.map(({ event, origIndex }, nth) => (
-        <Marker
-          key={origIndex}
-          position={event.coordinates!}
-          icon={createPin(nth + 1, selectedIndex === origIndex)}
-          eventHandlers={{ click: () => onSelectEvent(origIndex) }}
-        >
-          <Popup>
-            <strong>{event.title}</strong>
-            {event.location && <><br />{event.location}</>}
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
+    <APIProvider apiKey={API_KEY}>
+      <Map
+        defaultCenter={defaultCenter}
+        defaultZoom={13}
+        mapId="DEMO_MAP_ID"
+        gestureHandling="greedy"
+        disableDefaultUI={false}
+        style={{ width: '100%', height: '100%' }}
+      >
+        <PanTo center={panTarget} zoom={panZoom} />
+        {mapped.map(({ event, origIndex }, nth) => {
+          const active = selectedIndex === origIndex;
+          const color = event.category ? CATEGORIES[event.category].color : '#4f46e5';
+          return (
+            <AdvancedMarker
+              key={origIndex}
+              position={{ lat: event.coordinates![0], lng: event.coordinates![1] }}
+              onClick={() => onSelectEvent(origIndex)}
+              title={event.title}
+              zIndex={active ? 999 : nth}
+            >
+              <div
+                className={`map-pin${active ? ' map-pin--active' : ''}`}
+                style={{ background: active ? undefined : color }}
+              >
+                <span>{nth + 1}</span>
+              </div>
+            </AdvancedMarker>
+          );
+        })}
+      </Map>
+    </APIProvider>
   );
 }
