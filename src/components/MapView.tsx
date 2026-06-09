@@ -51,7 +51,6 @@ type PlaceSelectionDetails = {
   rating?: number;
   userRatingCount?: number;
   openNow?: boolean;
-  websiteUri?: string;
   googleMapsUri?: string;
   photoUri?: string;
   photoAttributionName?: string;
@@ -123,7 +122,6 @@ async function summarizePlaceSelection(
     rating: place.rating ?? undefined,
     userRatingCount: place.userRatingCount ?? undefined,
     openNow,
-    websiteUri: place.websiteURI ?? undefined,
     googleMapsUri: place.googleMapsURI ?? undefined,
     photoUri: photo?.getURI({ maxWidth: 560, maxHeight: 320 }),
     photoAttributionName: primaryAttribution?.displayName ?? undefined,
@@ -186,7 +184,6 @@ async function getPlaceSelectionDetails(placeId: string): Promise<PlaceSelection
         'priceLevel',
         'rating',
         'userRatingCount',
-        'websiteURI',
         'googleMapsURI',
         'photos',
       ],
@@ -210,7 +207,6 @@ async function findNearbyPlaceSelection(latLng: MapCenter): Promise<PlaceSelecti
         'priceLevel',
         'rating',
         'userRatingCount',
-        'websiteURI',
         'googleMapsURI',
         'photos',
       ],
@@ -438,9 +434,11 @@ function ContextMenuSelectionHandler({
 function PoiGlassOverlay({
   candidate,
   onClose,
+  onAddLocation,
 }: {
   candidate: PoiCandidate;
   onClose: () => void;
+  onAddLocation?: (event: ItineraryEvent) => void;
 }) {
   const map = useMap();
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
@@ -508,17 +506,6 @@ function PoiGlassOverlay({
           />
         </div>
       )}
-      <div className="map-poi-glass-top">
-        <span className="map-poi-glass-pill">Google Maps POI</span>
-        <button
-          className="map-poi-glass-close"
-          onClick={onClose}
-          type="button"
-          aria-label="Close POI popup"
-        >
-          x
-        </button>
-      </div>
       <div className="map-poi-glass-meta">
         {candidate.details.primaryTypeLabel && (
           <span className="map-poi-glass-chip">{candidate.details.primaryTypeLabel}</span>
@@ -551,18 +538,8 @@ function PoiGlassOverlay({
           )}
         </div>
       )}
-      {(candidate.details.websiteUri || candidate.details.googleMapsUri) && (
+      {(candidate.details.googleMapsUri || onAddLocation) && (
         <div className="map-poi-glass-actions">
-          {candidate.details.websiteUri && (
-            <a
-              className="map-poi-glass-link"
-              href={candidate.details.websiteUri}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Website
-            </a>
-          )}
           {candidate.details.googleMapsUri && (
             <a
               className="map-poi-glass-link secondary"
@@ -572,6 +549,18 @@ function PoiGlassOverlay({
             >
               Google Maps
             </a>
+          )}
+          {onAddLocation && (
+            <button
+              className="map-poi-glass-link map-poi-glass-link-button"
+              onClick={() => {
+                onClose();
+                onAddLocation(candidate.draft);
+              }}
+              type="button"
+            >
+              Add
+            </button>
           )}
         </div>
       )}
@@ -602,8 +591,8 @@ function AnimateCamera({
   zoom,
   offsetX,
 }: {
-  center: MapCenter;
-  zoom: number;
+  center: MapCenter | null;
+  zoom: number | null;
   offsetX: number;
 }) {
   const map = useMap();
@@ -618,7 +607,7 @@ function AnimateCamera({
   }, []);
 
   useEffect(() => {
-    if (!map) return;
+    if (!map || !center || zoom === null) return;
 
     if (frameRef.current !== null) {
       window.cancelAnimationFrame(frameRef.current);
@@ -674,7 +663,7 @@ function AnimateCamera({
         frameRef.current = null;
       }
     };
-  }, [center.lat, center.lng, zoom, offsetX, map]);
+  }, [center?.lat, center?.lng, zoom, offsetX, map]);
 
   return null;
 }
@@ -699,6 +688,7 @@ export default function MapView({
   visibleOffsetX = 0,
 }: Props) {
   const [poiCandidate, setPoiCandidate] = useState<PoiCandidate | null>(null);
+  const hasFocusedSelectionRef = useRef(false);
   const mapped = events
     .map((e, i) => ({ event: e, origIndex: i }))
     .filter(({ event }) => !!event.coordinates);
@@ -712,12 +702,25 @@ export default function MapView({
       ? events[selectedIndex].coordinates!
       : null;
 
+  useEffect(() => {
+    hasFocusedSelectionRef.current = false;
+  }, [defaultCenter.lat, defaultCenter.lng]);
+
+  useEffect(() => {
+    if (selectedCoord) {
+      hasFocusedSelectionRef.current = true;
+    }
+  }, [selectedCoord]);
+
+  const shouldShowOverview = !selectedCoord && !hasFocusedSelectionRef.current;
   const panTarget = selectedCoord
     ? { lat: selectedCoord[0], lng: selectedCoord[1] }
-    : defaultCenter;
+    : shouldShowOverview
+      ? defaultCenter
+      : null;
 
   // Closer zoom when a place is selected, wider overview otherwise
-  const panZoom = selectedCoord ? 17 : 13;
+  const panZoom = selectedCoord ? 17 : shouldShowOverview ? 13 : null;
   const mapStyles = cleanMode ? CLEAN_MAP_STYLES : undefined;
 
   useEffect(() => {
@@ -787,6 +790,7 @@ export default function MapView({
           <PoiGlassOverlay
             candidate={poiCandidate}
             onClose={() => setPoiCandidate(null)}
+            onAddLocation={onAddLocation}
           />
         )}
         {mapped.map(({ event, origIndex }, nth) => {

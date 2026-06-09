@@ -256,6 +256,11 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
+.map-poi-glass-link-button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
 .map-poi-glass-credit {
   position: relative;
   z-index: 1;
