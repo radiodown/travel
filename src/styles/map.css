@@ -212,33 +212,6 @@
   font-size: 0.82rem;
 }
 
-.map-poi-glass-hours {
-  position: relative;
-  z-index: 1;
-  margin-top: 12px;
-  padding: 11px 12px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.36);
-  border: 1px solid rgba(255, 255, 255, 0.58);
-}
-
-.map-poi-glass-section-label {
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #64748b;
-  margin-bottom: 7px;
-}
-
-.map-poi-glass-hours-list {
-  display: grid;
-  gap: 4px;
-  font-size: 0.73rem;
-  line-height: 1.45;
-  color: #334155;
-}
-
 .map-poi-glass-actions {
   position: relative;
   z-index: 1;

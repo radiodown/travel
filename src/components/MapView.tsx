@@ -50,7 +50,6 @@ type PlaceSelectionDetails = {
   priceLabel?: string;
   rating?: number;
   userRatingCount?: number;
-  openingHoursLines?: string[];
   openNow?: boolean;
   websiteUri?: string;
   googleMapsUri?: string;
@@ -123,10 +122,6 @@ async function summarizePlaceSelection(
     priceLabel: formatPriceLabel(place.priceLevel),
     rating: place.rating ?? undefined,
     userRatingCount: place.userRatingCount ?? undefined,
-    openingHoursLines:
-      place.currentOpeningHours?.weekdayDescriptions ??
-      place.regularOpeningHours?.weekdayDescriptions ??
-      undefined,
     openNow,
     websiteUri: place.websiteURI ?? undefined,
     googleMapsUri: place.googleMapsURI ?? undefined,
@@ -191,8 +186,6 @@ async function getPlaceSelectionDetails(placeId: string): Promise<PlaceSelection
         'priceLevel',
         'rating',
         'userRatingCount',
-        'currentOpeningHours',
-        'regularOpeningHours',
         'websiteURI',
         'googleMapsURI',
         'photos',
@@ -217,8 +210,6 @@ async function findNearbyPlaceSelection(latLng: MapCenter): Promise<PlaceSelecti
         'priceLevel',
         'rating',
         'userRatingCount',
-        'currentOpeningHours',
-        'regularOpeningHours',
         'websiteURI',
         'googleMapsURI',
         'photos',
@@ -453,7 +444,6 @@ function PoiGlassOverlay({
 }) {
   const map = useMap();
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
-  const openingPreview = candidate.details.openingHoursLines?.slice(0, 2) ?? [];
   const ratingCount = formatRatingCount(candidate.details.userRatingCount);
 
   useEffect(() => {
@@ -559,16 +549,6 @@ function PoiGlassOverlay({
           {ratingCount && (
             <span className="map-poi-glass-stat muted">{ratingCount} reviews</span>
           )}
-        </div>
-      )}
-      {!!openingPreview.length && (
-        <div className="map-poi-glass-hours">
-          <p className="map-poi-glass-section-label">Hours</p>
-          <ul className="map-poi-glass-hours-list">
-            {openingPreview.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
         </div>
       )}
       {(candidate.details.websiteUri || candidate.details.googleMapsUri) && (
