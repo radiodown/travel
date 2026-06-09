@@ -112,6 +112,8 @@ function parseDay(value: unknown): ItineraryDay | null {
   };
 
   if (isString(value.mapHint)) day.mapHint = value.mapHint;
+  if (isString(value.city)) day.city = value.city;
+  if (isCoordinatePair(value.cityCoordinates)) day.cityCoordinates = value.cityCoordinates;
 
   const reservations = parseReservations(value.reservations);
   if (reservations) day.reservations = reservations;

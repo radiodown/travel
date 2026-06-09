@@ -5,6 +5,8 @@ import MapView from '../components/MapView';
 import AddEventModal from '../components/AddEventModal';
 import { parseItineraryJson, serializeItinerary } from '../utils/itineraryJson';
 import { getDayReservationItems } from '../utils/reservations';
+import { useDaysWeather } from '../hooks/useDaysWeather';
+import { geocodeCity } from '../utils/weather';
 
 type Props = {
   days: ItineraryDay[];
@@ -33,6 +35,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const [editingEventIndex, setEditingEventIndex] = useState<number | null>(null);
   const [editingDayTitle, setEditingDayTitle] = useState(false);
   const [dayTitleDraft, setDayTitleDraft] = useState('');
+  const [cityDraft, setCityDraft] = useState('');
+  const [savingCity, setSavingCity] = useState(false);
   const [transferMessage, setTransferMessage] = useState<TransferMessage | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const [resizing, setResizing] = useState(false);
@@ -51,6 +55,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const longPressFired = useRef(false);
   const day = days[selectedDayIndex];
   const editingEvent = editingEventIndex !== null ? day.events[editingEventIndex] : null;
+  const daysWeather = useDaysWeather(days);
 
   // Reset selected event when day changes
   useEffect(() => {
@@ -62,7 +67,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   useEffect(() => {
     setEditingDayTitle(false);
     setDayTitleDraft(day.title);
-  }, [day.title, selectedDayIndex]);
+    setCityDraft(day.city ?? '');
+  }, [day.title, day.city, selectedDayIndex]);
 
   // Scroll active tab into view
   useEffect(() => {
@@ -165,28 +171,59 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
 
   const openDayTitleEditor = () => {
     setDayTitleDraft(day.title);
+    setCityDraft(day.city ?? '');
     setEditingDayTitle(true);
   };
 
   const cancelDayTitleEdit = () => {
     setDayTitleDraft(day.title);
+    setCityDraft(day.city ?? '');
     setEditingDayTitle(false);
   };
 
-  const saveDayTitle = () => {
+  const saveDayTitle = async () => {
     const nextTitle = dayTitleDraft.trim();
     if (!nextTitle) {
       cancelDayTitleEdit();
       return;
     }
 
-    if (nextTitle !== day.title) {
-      setDays((prev) =>
-        prev.map((currentDay, index) =>
-          index === selectedDayIndex ? { ...currentDay, title: nextTitle } : currentDay
-        )
-      );
+    const nextCity = cityDraft.trim();
+    const cityChanged = nextCity !== (day.city ?? '');
+
+    // Resolve the city to coordinates so the weather badge can use it.
+    let cityCoordinates = day.cityCoordinates;
+    if (cityChanged) {
+      if (!nextCity) {
+        cityCoordinates = undefined;
+      } else {
+        setSavingCity(true);
+        try {
+          cityCoordinates = (await geocodeCity(nextCity)) ?? undefined;
+          if (!cityCoordinates) {
+            showTransferStatus('error', `'${nextCity}' 위치를 찾지 못했습니다. 날씨는 기존 기준을 사용합니다.`);
+          }
+        } catch {
+          cityCoordinates = undefined;
+          showTransferStatus('error', '도시 위치 조회에 실패했습니다.');
+        } finally {
+          setSavingCity(false);
+        }
+      }
     }
+
+    setDays((prev) =>
+      prev.map((currentDay, index) =>
+        index === selectedDayIndex
+          ? {
+              ...currentDay,
+              title: nextTitle,
+              city: nextCity || undefined,
+              cityCoordinates,
+            }
+          : currentDay
+      )
+    );
 
     setEditingDayTitle(false);
   };
@@ -405,9 +442,6 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
 
       {/* Top nav */}
       <nav className="schedule-nav">
-        <button className="back-btn" onClick={onBack} type="button">
-          ← 메인으로
-        </button>
         <span className="schedule-nav-title">2026 Europe · Schedule</span>
         <div className="schedule-nav-tools">
           {transferMessage && (
@@ -474,34 +508,78 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
 
           {/* Day header */}
           <div className="sidebar-day-header">
-            <p className="sidebar-day-label">{day.day}</p>
+            <div className="sidebar-day-label-row">
+              <p className="sidebar-day-label">{day.day}</p>
+              {daysWeather[selectedDayIndex] && (
+                <span className="day-weather" aria-hidden="true">
+                  <span
+                    className="dw-half"
+                    title={`오전${daysWeather[selectedDayIndex].am.temp !== null ? ` ${daysWeather[selectedDayIndex].am.temp}°` : ''}`}
+                  >
+                    {daysWeather[selectedDayIndex].am.icon}
+                    {daysWeather[selectedDayIndex].am.temp !== null && (
+                      <span className="dw-temp">{daysWeather[selectedDayIndex].am.temp}°</span>
+                    )}
+                  </span>
+                  <span
+                    className="dw-half"
+                    title={`오후${daysWeather[selectedDayIndex].pm.temp !== null ? ` ${daysWeather[selectedDayIndex].pm.temp}°` : ''}`}
+                  >
+                    {daysWeather[selectedDayIndex].pm.icon}
+                    {daysWeather[selectedDayIndex].pm.temp !== null && (
+                      <span className="dw-temp">{daysWeather[selectedDayIndex].pm.temp}°</span>
+                    )}
+                  </span>
+                </span>
+              )}
+            </div>
             <div className="sidebar-day-title-row">
               {editingDayTitle ? (
-                <>
-                  <input
-                    className="sidebar-day-title-input"
-                    value={dayTitleDraft}
-                    onChange={(e) => setDayTitleDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        saveDayTitle();
-                      }
-                      if (e.key === 'Escape') {
-                        e.preventDefault();
-                        cancelDayTitleEdit();
-                      }
-                    }}
-                    autoFocus
-                  />
+                <div className="sidebar-day-edit">
+                  <div className="sidebar-day-edit-fields">
+                    <input
+                      className="sidebar-day-title-input"
+                      value={dayTitleDraft}
+                      placeholder="일자 제목"
+                      onChange={(e) => setDayTitleDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          saveDayTitle();
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          cancelDayTitleEdit();
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <input
+                      className="sidebar-day-city-input"
+                      value={cityDraft}
+                      placeholder="🌤 날씨 기준 도시 (예: 프라하)"
+                      onChange={(e) => setCityDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          saveDayTitle();
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          cancelDayTitleEdit();
+                        }
+                      }}
+                    />
+                  </div>
                   <div className="sidebar-day-title-actions">
                     <button
                       className="sidebar-day-title-btn save"
                       onClick={saveDayTitle}
                       title="저장"
                       type="button"
+                      disabled={savingCity}
                     >
-                      ✓
+                      {savingCity ? '…' : '✓'}
                     </button>
                     <button
                       className="sidebar-day-title-btn cancel"
@@ -512,7 +590,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                       ×
                     </button>
                   </div>
-                </>
+                </div>
               ) : (
                 <>
                   <h2 className="sidebar-day-title">{day.title}</h2>

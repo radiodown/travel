@@ -31,6 +31,8 @@ export type ItineraryDay = {
   events: ItineraryEvent[];
   mapHint?: string;
   reservations?: ReservationInfo[];
+  city?: string;
+  cityCoordinates?: [number, number]; // [lat, lng] used as the weather location
 };
 
 const itinerary: { days: ItineraryDay[] } = {
