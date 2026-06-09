@@ -248,6 +248,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const [isNarrow, setIsNarrow] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches
   );
+  const [showMobileEventList, setShowMobileEventList] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<EventContextMenu | null>(null);
@@ -416,6 +417,12 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
+
+  useEffect(() => {
+    if (!isNarrow) {
+      setShowMobileEventList(false);
+    }
+  }, [isNarrow]);
 
   const visibleOffsetX = isNarrow ? 0 : sidebarWidth / 2;
 
@@ -1290,6 +1297,16 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
             </span>
           )}
           <button
+            className={`schedule-icon-btn schedule-list-btn${showMobileEventList ? ' is-active' : ''}`}
+            onClick={() => setShowMobileEventList((prev) => !prev)}
+            title="Reorder schedule"
+            aria-label="Reorder schedule"
+            aria-pressed={showMobileEventList}
+            type="button"
+          >
+            ☰
+          </button>
+          <button
             className={`schedule-map-mode-btn${cleanMapMode ? ' is-active' : ''}`}
             onClick={() => setCleanMapMode((prev) => !prev)}
             title={cleanMapMode ? '기본 지도 보기' : '클린 맵 보기'}
@@ -1346,7 +1363,10 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
       </nav>
 
       <div className="schedule-layout">
-        <aside className="schedule-sidebar" style={{ width: sidebarWidth }}>
+        <aside
+          className={`schedule-sidebar${showMobileEventList ? ' is-mobile-list-open' : ''}`}
+          style={{ width: sidebarWidth }}
+        >
           <div className="sidebar-tabs-wrap">
             <div className="sidebar-tabs" ref={tabsRef}>
               {days.map((item, index) => (
@@ -1489,8 +1509,10 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                   onTouchMove={handleSidebarEventTouchMove}
                   onTouchEnd={handleSidebarEventTouchEnd}
                   onTouchCancel={handleSidebarEventTouchEnd}
-                  draggable
-                  onDragStart={() => setDragIndex(index)}
+                  draggable={!isNarrow}
+                  onDragStart={() => {
+                    if (!isNarrow) setDragIndex(index);
+                  }}
                   onDragEnter={() => setOverIndex(index)}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {

@@ -108,6 +108,16 @@
   color: var(--accent-strong);
 }
 
+.schedule-list-btn {
+  display: none;
+}
+
+.schedule-list-btn.is-active {
+  background: color-mix(in srgb, var(--accent-tint) 82%, rgba(255, 255, 255, 0.94));
+  border-color: color-mix(in srgb, var(--accent) 24%, rgba(255, 255, 255, 0.82));
+  color: var(--accent-strong);
+}
+
 .schedule-map-mode-btn {
   height: 34px;
   padding: 0 12px;

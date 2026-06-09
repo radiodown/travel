@@ -35,6 +35,8 @@
     inset 0 1px 1px rgba(255, 255, 255, 0.95),
     inset 0 -1px 1px rgba(255, 255, 255, 0.25);
   pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   animation: poiGlassIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -228,8 +230,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
-  padding: 8px 12px;
+  min-height: 42px;
+  padding: 10px 14px;
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.9) 100%);
   border: 1px solid rgba(255, 255, 255, 0.24);
@@ -240,6 +242,10 @@
   font-size: 0.76rem;
   font-weight: 700;
   text-decoration: none;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
   transition: transform 0.16s, box-shadow 0.16s, background 0.16s;
 }
 
@@ -262,6 +268,7 @@
 .map-poi-glass-link-button {
   cursor: pointer;
   font-family: inherit;
+  min-width: 88px;
 }
 
 .map-poi-glass-credit {
@@ -676,6 +683,19 @@
 @media (max-width: 860px) {
   .map-control-slot {
     margin: 0 12px 108px 0;
+  }
+
+  .map-poi-glass {
+    width: min(340px, calc(100vw - 24px));
+  }
+
+  .map-poi-glass-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(104px, 1fr);
+  }
+
+  .map-poi-glass-link {
+    min-height: 46px;
   }
 
   .map-toast {

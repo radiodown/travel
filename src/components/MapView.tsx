@@ -697,6 +697,7 @@ function PoiGlassOverlay({
   const map = useMap();
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const ratingCount = formatRatingCount(candidate.details.userRatingCount);
+  const addTriggeredRef = useRef(false);
 
   useEffect(() => {
     if (!map) return;
@@ -710,9 +711,10 @@ function PoiGlassOverlay({
     element.style.pointerEvents = 'none';
 
     overlay.onAdd = () => {
-      const pane = overlay.getPanes()?.floatPane ?? overlay.getPanes()?.overlayMouseTarget;
+      const pane = overlay.getPanes()?.overlayMouseTarget ?? overlay.getPanes()?.floatPane;
       if (!pane) return;
       pane.appendChild(element);
+      google.maps.OverlayView.preventMapHitsAndGesturesFrom(element);
       setContainer(element);
     };
 
@@ -740,7 +742,25 @@ function PoiGlassOverlay({
     };
   }, [map, candidate.position.lat, candidate.position.lng]);
 
+  useEffect(() => {
+    addTriggeredRef.current = false;
+  }, [candidate.draft]);
+
   if (!container) return null;
+
+  const stopMapGesture = (event: React.SyntheticEvent) => {
+    event.stopPropagation();
+  };
+
+  const addLocation = (event: React.SyntheticEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (addTriggeredRef.current || !onAddLocation) return;
+    addTriggeredRef.current = true;
+    onClose();
+    onAddLocation(candidate.draft);
+  };
 
   return createPortal(
     <div
@@ -748,8 +768,14 @@ function PoiGlassOverlay({
       role="dialog"
       aria-modal="false"
       aria-label={candidate.draft.title}
-      onClick={(event) => event.stopPropagation()}
-      onMouseDown={(event) => event.stopPropagation()}
+      onClick={stopMapGesture}
+      onMouseDown={stopMapGesture}
+      onPointerDown={stopMapGesture}
+      onPointerMove={stopMapGesture}
+      onPointerUp={stopMapGesture}
+      onTouchStart={stopMapGesture}
+      onTouchMove={stopMapGesture}
+      onTouchEnd={stopMapGesture}
     >
       {candidate.details.photoUri && (
         <div className="map-poi-glass-photo-wrap">
@@ -807,10 +833,8 @@ function PoiGlassOverlay({
           {onAddLocation && (
             <button
               className="map-poi-glass-link map-poi-glass-link-button"
-              onClick={() => {
-                onClose();
-                onAddLocation(candidate.draft);
-              }}
+              onClick={addLocation}
+              onPointerUp={addLocation}
               type="button"
             >
               Add
