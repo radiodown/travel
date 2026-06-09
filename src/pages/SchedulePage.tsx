@@ -1233,13 +1233,6 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                     <p className="map-toast-route-leg">
                       {event.flight.originTitle} <span aria-hidden="true">→</span> {event.flight.destinationTitle}
                     </p>
-                    <div className="map-toast-route-tags">
-                      {getFlightMetaLabels(event.flight).map((label) => (
-                        <span key={label} className="map-toast-route-tag">
-                          {label}
-                        </span>
-                      ))}
-                    </div>
                   </>
                 )}
                 {false && isRoute && (

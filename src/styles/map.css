@@ -230,8 +230,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 42px;
-  padding: 10px 14px;
+  min-height: 38px;
+  padding: 8px 13px;
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.9) 100%);
   border: 1px solid rgba(255, 255, 255, 0.24);
@@ -268,7 +268,7 @@
 .map-poi-glass-link-button {
   cursor: pointer;
   font-family: inherit;
-  min-width: 88px;
+  min-width: 74px;
 }
 
 .map-poi-glass-credit {
@@ -690,12 +690,12 @@
   }
 
   .map-poi-glass-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(104px, 1fr);
+    display: flex;
+    justify-content: flex-start;
   }
 
   .map-poi-glass-link {
-    min-height: 46px;
+    min-height: 40px;
   }
 
   .map-toast {

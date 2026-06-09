@@ -571,14 +571,24 @@ function CurrentLocationControl({
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const [currentLocation, setCurrentLocation] = useState<MapCenter | null>(null);
   const [locating, setLocating] = useState(false);
+  const [tracking, setTracking] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const errorTimeoutRef = useRef<number | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+
+  const clearLocationWatch = () => {
+    if (watchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+  };
 
   useEffect(() => {
     return () => {
       if (errorTimeoutRef.current !== null) {
         window.clearTimeout(errorTimeoutRef.current);
       }
+      clearLocationWatch();
     };
   }, []);
 
@@ -616,16 +626,26 @@ function CurrentLocationControl({
   };
 
   const handleLocate = () => {
-    if (!map || locating) return;
+    if (!map) return;
+
+    if (tracking) {
+      clearLocationWatch();
+      setTracking(false);
+      setLocating(false);
+      return;
+    }
+
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       showLocationError('Location unavailable');
       return;
     }
 
+    clearLocationWatch();
+    setTracking(true);
     setLocating(true);
     setLocationError(null);
 
-    navigator.geolocation.getCurrentPosition(
+    watchIdRef.current = navigator.geolocation.watchPosition(
       ({ coords }) => {
         const nextPosition = { lat: coords.latitude, lng: coords.longitude };
         const nextZoom = Math.max(map.getZoom() ?? 13, 16);
@@ -642,12 +662,14 @@ function CurrentLocationControl({
               ? 'Location timeout'
               : 'Location failed';
         showLocationError(message);
+        clearLocationWatch();
+        setTracking(false);
         setLocating(false);
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 30000,
+        timeout: 12000,
+        maximumAge: 5000,
       }
     );
   };
@@ -667,12 +689,12 @@ function CurrentLocationControl({
           <div className="map-control-stack">
             {locationError && <p className="map-control-hint">{locationError}</p>}
             <button
-              className={`map-locate-btn${locating ? ' is-loading' : ''}`}
+              className={`map-locate-btn${tracking ? ' is-active' : ''}${locating ? ' is-loading' : ''}`}
               onClick={handleLocate}
               type="button"
-              aria-label="Go to my location"
-              title="Go to my location"
-              disabled={locating}
+              aria-label={tracking ? 'Stop live location' : 'Track my location'}
+              aria-pressed={tracking}
+              title={tracking ? 'Stop live location' : 'Track my location'}
             >
               <span className="map-locate-btn-icon" aria-hidden="true">
                 ◎
