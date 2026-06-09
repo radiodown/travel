@@ -1,4 +1,4 @@
-import mainBg from '../../main.jpeg';
+import { mainBg } from '../assets';
 
 type Props = {
   onViewSchedule: () => void;
