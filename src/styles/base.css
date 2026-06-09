@@ -1,6 +1,21 @@
 :root {
   font-family: Inter, system-ui, -apple-system, 'Malgun Gothic', sans-serif;
   color: #0f172a;
+
+  /* ──────────────────────────────────────────────
+     Theme accent — change ONLY this one color to
+     recolor every accent/icon across the whole app.
+     Everything below is derived from it automatically.
+     ────────────────────────────────────────────── */
+  --accent: #2697b9;
+
+  /* Derived shades & tints (no need to edit these) */
+  --accent-strong: color-mix(in srgb, var(--accent), black 18%);  /* hover/pressed */
+  --accent-soft: color-mix(in srgb, var(--accent), white 35%);    /* lighter accent */
+  --accent-light: color-mix(in srgb, var(--accent), white 55%);   /* lightest, on dark bg */
+  --accent-tint: color-mix(in srgb, var(--accent) 8%, white);     /* very light bg tint */
+  --accent-tint-2: color-mix(in srgb, var(--accent) 18%, white);  /* light bg tint */
+  --accent-tint-3: color-mix(in srgb, var(--accent) 30%, white);  /* light border tint */
 }
 
 * {

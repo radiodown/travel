@@ -10,13 +10,23 @@ import { CATEGORIES } from '../data/categories';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
-function PanTo({ center, zoom }: { center: { lat: number; lng: number }; zoom: number }) {
+function PanTo({
+  center,
+  zoom,
+  offsetX,
+}: {
+  center: { lat: number; lng: number };
+  zoom: number;
+  offsetX: number;
+}) {
   const map = useMap();
   useEffect(() => {
     if (!map) return;
-    map.panTo(center);
     map.setZoom(zoom);
-  }, [center, zoom, map]);
+    map.panTo(center);
+    // Shift the target into the visible area (right of the floating sidebar)
+    if (offsetX) map.panBy(-offsetX, 0);
+  }, [center, zoom, offsetX, map]);
   return null;
 }
 
@@ -24,9 +34,12 @@ type Props = {
   events: ItineraryEvent[];
   selectedIndex: number | null;
   onSelectEvent: (index: number) => void;
+  /** Horizontal pixels covered by the floating sidebar, so the map can center
+   *  the selected place within the remaining visible area. */
+  visibleOffsetX?: number;
 };
 
-export default function MapView({ events, selectedIndex, onSelectEvent }: Props) {
+export default function MapView({ events, selectedIndex, onSelectEvent, visibleOffsetX = 0 }: Props) {
   const mapped = events
     .map((e, i) => ({ event: e, origIndex: i }))
     .filter(({ event }) => !!event.coordinates);
@@ -70,10 +83,10 @@ export default function MapView({ events, selectedIndex, onSelectEvent }: Props)
         disableDefaultUI={true}
         style={{ width: '100%', height: '100%' }}
       >
-        <PanTo center={panTarget} zoom={panZoom} />
+        <PanTo center={panTarget} zoom={panZoom} offsetX={visibleOffsetX} />
         {mapped.map(({ event, origIndex }, nth) => {
           const active = selectedIndex === origIndex;
-          const color = event.category ? CATEGORIES[event.category].color : '#4f46e5';
+          const color = event.category ? CATEGORIES[event.category].color : 'var(--accent)';
           return (
             <AdvancedMarker
               key={origIndex}

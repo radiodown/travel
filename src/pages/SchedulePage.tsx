@@ -36,11 +36,19 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const [transferMessage, setTransferMessage] = useState<TransferMessage | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const [resizing, setResizing] = useState(false);
+  // Below this width the sidebar stacks on top instead of on the left,
+  // so no horizontal offset is needed for centering in the visible area.
+  const [isNarrow, setIsNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches
+  );
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const transferMessageTimeoutRef = useRef<number | null>(null);
+  const toastTouchStartX = useRef<number | null>(null);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressFired = useRef(false);
   const day = days[selectedDayIndex];
   const editingEvent = editingEventIndex !== null ? day.events[editingEventIndex] : null;
 
@@ -67,8 +75,22 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
       if (transferMessageTimeoutRef.current !== null) {
         window.clearTimeout(transferMessageTimeoutRef.current);
       }
+      if (longPressTimer.current !== null) {
+        window.clearTimeout(longPressTimer.current);
+      }
     };
   }, []);
+
+  // Track whether the sidebar is stacked (narrow) or on the left (wide)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 860px)');
+    const onChange = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Center selected place / toast within the visible map area (right of sidebar)
+  const visibleOffsetX = isNarrow ? 0 : sidebarWidth / 2;
 
   // ── Sidebar resize ──
   const startResize = useCallback(() => setResizing(true), []);
@@ -248,6 +270,61 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     setOverIndex(null);
   };
 
+  // ── Swipe between mappable events (mobile toast) ──
+  const goToAdjacentEvent = (dir: 1 | -1) => {
+    const selectable = day.events.flatMap((e, i) => (e.coordinates ? [i] : []));
+    if (selectable.length === 0) return;
+    const cur = selectedEventIndex !== null ? selectable.indexOf(selectedEventIndex) : -1;
+    const next = cur === -1 ? 0 : (cur + dir + selectable.length) % selectable.length;
+    setSelectedEventIndex(selectable[next]);
+  };
+
+  const clearLongPress = () => {
+    if (longPressTimer.current !== null) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const startLongPress = () => {
+    longPressFired.current = false;
+    clearLongPress();
+    longPressTimer.current = window.setTimeout(() => {
+      longPressFired.current = true;
+      if (selectedEventIndex !== null) openEditModal(selectedEventIndex);
+    }, 500);
+  };
+
+  const handleToastTouchStart = (e: React.TouchEvent) => {
+    toastTouchStartX.current = e.touches[0].clientX;
+    startLongPress();
+  };
+
+  const handleToastTouchMove = (e: React.TouchEvent) => {
+    // Any meaningful movement means it's a swipe, not a long press
+    if (toastTouchStartX.current === null) return;
+    if (Math.abs(e.touches[0].clientX - toastTouchStartX.current) > 10) clearLongPress();
+  };
+
+  const handleToastTouchEnd = (e: React.TouchEvent) => {
+    clearLongPress();
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      toastTouchStartX.current = null;
+      return; // edit already opened
+    }
+    if (toastTouchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - toastTouchStartX.current;
+    toastTouchStartX.current = null;
+    if (Math.abs(dx) < 40) return; // ignore taps / tiny moves
+    goToAdjacentEvent(dx < 0 ? 1 : -1); // swipe left → next, right → previous
+  };
+
+  // Mouse long-press (desktop): hold the toast to edit
+  const handleToastMouseDown = () => startLongPress();
+  const handleToastMouseUp = () => clearLongPress();
+  const handleToastMouseLeave = () => clearLongPress();
+
   // Build map number for each event (only those with coordinates)
   const mapNumbers: Record<number, number> = {};
   let counter = 1;
@@ -258,6 +335,74 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
 
   return (
     <div className="schedule-page">
+      {/* Full-bleed map background */}
+      <div className="schedule-map">
+        <MapView
+          events={day.events}
+          selectedIndex={selectedEventIndex}
+          onSelectEvent={(i) => setSelectedEventIndex(selectedEventIndex === i ? null : i)}
+          visibleOffsetX={visibleOffsetX}
+        />
+
+        {/* Selected place toast */}
+        {selectedEventIndex !== null && day.events[selectedEventIndex] && (() => {
+          const ev = day.events[selectedEventIndex];
+          const cat = ev.category ? CATEGORIES[ev.category] : null;
+          const eventDescription = getEventDescription(ev.description, ev.note);
+          return (
+            <div
+              key={selectedEventIndex}
+              className="map-toast"
+              style={{ ['--toast-shift' as string]: `${visibleOffsetX}px` } as React.CSSProperties}
+              onTouchStart={handleToastTouchStart}
+              onTouchMove={handleToastTouchMove}
+              onTouchEnd={handleToastTouchEnd}
+              onTouchCancel={handleToastMouseUp}
+              onMouseDown={handleToastMouseDown}
+              onMouseUp={handleToastMouseUp}
+              onMouseLeave={handleToastMouseLeave}
+            >
+              <div className="map-toast-body">
+                <div className="map-toast-top">
+                  {cat && (
+                    <span
+                      className="map-toast-cat"
+                      style={{ background: cat.light, color: cat.color }}
+                    >
+                      {cat.icon} {cat.label}
+                    </span>
+                  )}
+                  {ev.time && <span className="map-toast-time">{ev.time}</span>}
+                </div>
+                <h4 className="map-toast-title">{ev.title}</h4>
+                {ev.location && <p className="map-toast-loc">📍 {ev.location}</p>}
+                {eventDescription && <p className="map-toast-desc">{eventDescription}</p>}
+                {ev.attachment && (
+                  <div className="map-toast-actions">
+                    <a
+                      className="map-toast-attach"
+                      href={ev.attachment.dataUrl}
+                      download={ev.attachment.name}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      📎 {ev.attachment.name} 열기
+                    </a>
+                  </div>
+                )}
+              </div>
+              <button
+                className="map-toast-close"
+                onClick={() => setSelectedEventIndex(null)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+          );
+        })()}
+      </div>
+
       {/* Top nav */}
       <nav className="schedule-nav">
         <button className="back-btn" onClick={onBack} type="button">
@@ -270,6 +415,15 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
               {transferMessage.text}
             </span>
           )}
+          <button
+            className="schedule-icon-btn schedule-add-btn"
+            onClick={openAddModal}
+            title="일정 추가"
+            aria-label="일정 추가"
+            type="button"
+          >
+            ＋
+          </button>
           <button
             className="schedule-icon-btn"
             onClick={handleExportJson}
@@ -492,62 +646,6 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           className={`resize-handle${resizing ? ' resizing' : ''}`}
           onMouseDown={startResize}
         />
-
-        {/* ── Map ── */}
-        <div className="schedule-map">
-          <MapView
-            events={day.events}
-            selectedIndex={selectedEventIndex}
-            onSelectEvent={(i) => setSelectedEventIndex(selectedEventIndex === i ? null : i)}
-          />
-
-          {/* Selected place toast */}
-          {selectedEventIndex !== null && day.events[selectedEventIndex] && (() => {
-            const ev = day.events[selectedEventIndex];
-            const cat = ev.category ? CATEGORIES[ev.category] : null;
-            const eventDescription = getEventDescription(ev.description, ev.note);
-            return (
-              <div className="map-toast">
-                <div className="map-toast-body">
-                  <div className="map-toast-top">
-                    {cat && (
-                      <span
-                        className="map-toast-cat"
-                        style={{ background: cat.light, color: cat.color }}
-                      >
-                        {cat.icon} {cat.label}
-                      </span>
-                    )}
-                    {ev.time && <span className="map-toast-time">{ev.time}</span>}
-                  </div>
-                  <h4 className="map-toast-title">{ev.title}</h4>
-                  {ev.location && <p className="map-toast-loc">📍 {ev.location}</p>}
-                  {eventDescription && <p className="map-toast-desc">{eventDescription}</p>}
-                  {ev.attachment && (
-                    <div className="map-toast-actions">
-                      <a
-                        className="map-toast-attach"
-                        href={ev.attachment.dataUrl}
-                        download={ev.attachment.name}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        📎 {ev.attachment.name} 열기
-                      </a>
-                    </div>
-                  )}
-                </div>
-                <button
-                  className="map-toast-close"
-                  onClick={() => setSelectedEventIndex(null)}
-                  type="button"
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })()}
-        </div>
       </div>
 
       {showEventModal && (

@@ -15,6 +15,11 @@
     gap: 10px;
   }
 
+  /* Show the nav add-event button on mobile */
+  .schedule-add-btn {
+    display: inline-flex;
+  }
+
   .schedule-nav-title {
     min-width: 0;
   }
@@ -27,14 +32,34 @@
     flex-direction: column;
   }
 
+  /* On mobile the map is the full background; the sidebar collapses to just
+     the day tabs under the nav. Events are browsed by swiping the toast. */
   .schedule-sidebar {
     width: 100% !important;
-    max-height: 45vh;
-    border-bottom: 1px solid #e2e8f0;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    border-right: none;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
   }
 
-  .schedule-map {
-    height: 55vh;
-    flex: none;
+  /* Hide everything except the day tabs */
+  .sidebar-day-header,
+  .sidebar-event-list,
+  .add-event-btn,
+  .sidebar-res {
+    display: none;
+  }
+
+  /* Day tabs become a glass bar directly under the nav */
+  .sidebar-tabs-wrap {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(30px) saturate(185%) brightness(1.05);
+    -webkit-backdrop-filter: blur(30px) saturate(185%) brightness(1.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.1);
   }
 }
