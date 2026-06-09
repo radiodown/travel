@@ -260,28 +260,27 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
             </div>
           </div>
 
-          <label className="field">
-            <span>제목 *</span>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: 프라하성 방문"
-              autoFocus
-            />
-          </label>
+          <div className="field-row">
+            <label className="field">
+              <span>제목 *</span>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="예: 프라하성 방문"
+                autoFocus
+              />
+            </label>
 
-          <label className="field">
-            <span>시간</span>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              step={300}
-            />
-          </label>
-
-          <p className="field-hint">시간은 직접 입력하지 않고 선택해서 넣을 수 있습니다.</p>
-
+            <label className="field field-time">
+              <span>시간</span>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                step={300}
+              />
+            </label>
+          </div>
           <label className="field">
             <span>설명</span>
             <textarea
@@ -324,7 +323,7 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
                     title="현재 위치 가져오기"
                     aria-label="현재 위치 가져오기"
                   >
-                    {geoLocating ? '...' : 'GPS'}
+                    {geoLocating ? '...' : '📍'}
                   </button>
                 </div>
                 {searching && <span className="geo-spinner">검색 중...</span>}
@@ -340,9 +339,6 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
                 )}
               </div>
             )}
-            <p className="field-hint">
-              검색창에서 주소를 입력하거나 GPS 버튼을 눌러 현재 위치와 좌표를 설정할 수 있습니다.
-            </p>
             {geoError && <p className="field-error">{geoError}</p>}
           </div>
 

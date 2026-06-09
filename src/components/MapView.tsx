@@ -67,7 +67,7 @@ export default function MapView({ events, selectedIndex, onSelectEvent }: Props)
         defaultZoom={13}
         mapId="DEMO_MAP_ID"
         gestureHandling="greedy"
-        disableDefaultUI={false}
+        disableDefaultUI={true}
         style={{ width: '100%', height: '100%' }}
       >
         <PanTo center={panTarget} zoom={panZoom} />
