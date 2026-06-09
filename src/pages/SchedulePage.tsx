@@ -18,6 +18,7 @@ type Props = {
 
 const MIN_WIDTH = 280;
 const MAX_WIDTH = 620;
+const MAP_CLEAN_MODE_STORAGE_KEY = 'travel-map-clean-mode';
 
 type TransferMessage = {
   kind: 'success' | 'error';
@@ -43,6 +44,11 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const [transferMessage, setTransferMessage] = useState<TransferMessage | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const [resizing, setResizing] = useState(false);
+  const [cleanMapMode, setCleanMapMode] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.localStorage.getItem(MAP_CLEAN_MODE_STORAGE_KEY) !== 'false';
+  });
+  const [draftEvent, setDraftEvent] = useState<ItineraryEvent | null>(null);
   // Below this width the sidebar stacks on top instead of on the left,
   // so no horizontal offset is needed for centering in the visible area.
   const [isNarrow, setIsNarrow] = useState(
@@ -69,6 +75,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   useEffect(() => {
     selectEvent(null);
     setEditingEventIndex(null);
+    setDraftEvent(null);
     setShowEventModal(false);
   }, [selectEvent, selectedDayIndex]);
 
@@ -94,6 +101,11 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(MAP_CLEAN_MODE_STORAGE_KEY, String(cleanMapMode));
+  }, [cleanMapMode]);
 
   // Track whether the sidebar is stacked (narrow) or on the left (wide)
   useEffect(() => {
@@ -160,14 +172,18 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     if (editingEventIndex !== null) {
       selectEvent(editingEventIndex);
     }
+
+    setDraftEvent(null);
   };
 
   const openAddModal = () => {
     setEditingEventIndex(null);
+    setDraftEvent(null);
     setShowEventModal(true);
   };
 
   const openEditModal = (eventIndex: number) => {
+    setDraftEvent(null);
     setEditingEventIndex(eventIndex);
     setShowEventModal(true);
   };
@@ -175,6 +191,14 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const closeEventModal = () => {
     setShowEventModal(false);
     setEditingEventIndex(null);
+    setDraftEvent(null);
+  };
+
+  const handleAddLocationFromMap = (event: ItineraryEvent) => {
+    selectEvent(null);
+    setDraftEvent(event);
+    setEditingEventIndex(null);
+    setShowEventModal(true);
   };
 
   const openDayTitleEditor = () => {
@@ -388,6 +412,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           events={day.events}
           selectedIndex={selectedEventIndex}
           onSelectEvent={(i) => selectEvent(selectedEventIndex === i ? null : i)}
+          cleanMode={cleanMapMode}
+          onAddLocation={handleAddLocationFromMap}
           visibleOffsetX={visibleOffsetX}
         />
 
@@ -459,6 +485,16 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
               {transferMessage.text}
             </span>
           )}
+          <button
+            className={`schedule-map-mode-btn${cleanMapMode ? ' is-active' : ''}`}
+            onClick={() => setCleanMapMode((prev) => !prev)}
+            title={cleanMapMode ? '기본 지도 보기' : '클린 맵 보기'}
+            aria-pressed={cleanMapMode}
+            type="button"
+          >
+            <span className="schedule-map-mode-label">Map</span>
+            <span className="schedule-map-mode-value">{cleanMapMode ? 'Clean' : 'Default'}</span>
+          </button>
           <button
             className="schedule-icon-btn schedule-add-btn"
             onClick={openAddModal}
@@ -738,7 +774,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
 
       {showEventModal && (
         <AddEventModal
-          initialEvent={editingEvent}
+          initialEvent={draftEvent ?? editingEvent}
+          mode={editingEventIndex !== null ? 'edit' : 'create'}
           onClose={closeEventModal}
           onSave={handleSaveEvent}
         />

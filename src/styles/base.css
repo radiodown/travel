@@ -24,15 +24,15 @@
   --accent-tint-3: color-mix(in srgb, var(--accent) 30%, white);  /* light border tint */
 }
 
-@supports (height: 100svh) {
+@supports (height: 100lvh) {
   :root {
-    --app-height: 100svh;
+    --app-height: 100lvh;
   }
 }
 
-@supports (height: 100dvh) {
+@supports (height: 100lvh) and (height: 100dvh) {
   :root {
-    --app-height: 100dvh;
+    --viewport-bottom-offset: calc(100lvh - 100dvh);
   }
 }
 

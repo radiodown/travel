@@ -90,6 +90,46 @@
   color: var(--accent-strong);
 }
 
+.schedule-map-mode-btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.82);
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.schedule-map-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.84);
+  color: #1e293b;
+}
+
+.schedule-map-mode-btn.is-active {
+  background: color-mix(in srgb, var(--accent-tint) 82%, rgba(255, 255, 255, 0.94));
+  border-color: color-mix(in srgb, var(--accent) 24%, rgba(255, 255, 255, 0.82));
+  color: var(--accent-strong);
+}
+
+.schedule-map-mode-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.schedule-map-mode-value {
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 /* Add-event button lives in the nav only on mobile (desktop has the
    sidebar's add button) */
 .schedule-add-btn {

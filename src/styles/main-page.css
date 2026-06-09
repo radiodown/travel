@@ -45,7 +45,7 @@
 .main-content {
   position: relative;
   z-index: 1;
-  padding: 0 48px calc(52px + var(--safe-area-bottom));
+  padding: 0 48px calc(52px + var(--safe-area-bottom) + var(--viewport-bottom-offset));
   max-width: 900px;
 }
 

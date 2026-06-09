@@ -5,6 +5,324 @@
   overflow: hidden;
 }
 
+.map-poi-overlay {
+  z-index: 420;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.map-poi-glass {
+  position: relative;
+  width: min(320px, calc(100vw - 36px));
+  padding: 12px 12px 13px;
+  border-radius: 24px;
+  transform: translate(-50%, calc(-100% - 18px));
+  background:
+    linear-gradient(
+      155deg,
+      rgba(255, 255, 255, 0.66) 0%,
+      rgba(255, 255, 255, 0.2) 42%,
+      rgba(255, 255, 255, 0.42) 100%
+    );
+  -webkit-backdrop-filter: blur(5px) saturate(185%);
+  backdrop-filter: blur(5px) saturate(185%);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 26px 60px rgba(15, 23, 42, 0.22),
+    inset 0 1px 1px rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.25);
+  pointer-events: auto;
+  animation: poiGlassIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.map-poi-glass-photo-wrap {
+  position: relative;
+  z-index: 1;
+  margin: -2px -2px 12px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.map-poi-glass-photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.map-poi-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.56) 0%,
+    rgba(255, 255, 255, 0.16) 18%,
+    rgba(255, 255, 255, 0) 36%
+  );
+  pointer-events: none;
+}
+
+.map-poi-glass::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 18px;
+  height: 18px;
+  border-right: 1px solid rgba(255, 255, 255, 0.72);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.34);
+  transform: translateX(-50%) rotate(45deg);
+  -webkit-backdrop-filter: blur(16px) saturate(185%);
+  backdrop-filter: blur(16px) saturate(185%);
+}
+
+.map-poi-glass-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.map-poi-glass-meta {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.map-poi-glass-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  color: #64748b;
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.map-poi-glass-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.44);
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  color: #334155;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.map-poi-glass-chip.is-open {
+  background: rgba(220, 252, 231, 0.72);
+  color: #166534;
+}
+
+.map-poi-glass-chip.is-closed {
+  background: rgba(254, 226, 226, 0.72);
+  color: #991b1b;
+}
+
+.map-poi-glass-close {
+  position: relative;
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  color: #64748b;
+  font-size: 1.15rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.16s, color 0.16s, transform 0.16s;
+}
+
+.map-poi-glass-close:hover {
+  background: rgba(255, 255, 255, 0.52);
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+.map-poi-glass-title {
+  position: relative;
+  z-index: 1;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.32;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.map-poi-glass-location {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  font-size: 0.77rem;
+  line-height: 1.52;
+  color: #475569;
+}
+
+.map-poi-glass-stats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.map-poi-glass-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.map-poi-glass-stat.muted {
+  color: #475569;
+  font-weight: 700;
+}
+
+.map-poi-glass-stat-icon {
+  color: #b45309;
+  font-size: 0.82rem;
+}
+
+.map-poi-glass-hours {
+  position: relative;
+  z-index: 1;
+  margin-top: 12px;
+  padding: 11px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.36);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+}
+
+.map-poi-glass-section-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 7px;
+}
+
+.map-poi-glass-hours-list {
+  display: grid;
+  gap: 4px;
+  font-size: 0.73rem;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.map-poi-glass-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.map-poi-glass-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  color: #f8fafc;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 0.16s, box-shadow 0.16s, background 0.16s;
+}
+
+.map-poi-glass-link:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.map-poi-glass-link.secondary {
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  color: #0f172a;
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.map-poi-glass-credit {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.map-poi-glass-credit a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.map-poi-glass-pin {
+  position: absolute;
+  left: 50%;
+  bottom: -21px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 0 0 5px rgba(255, 255, 255, 0.18),
+    0 10px 24px rgba(37, 99, 235, 0.28);
+  transform: translateX(-50%);
+}
+
+@keyframes poiGlassIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 6px)) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 18px)) scale(1);
+  }
+}
+
 .map-pin {
   width: 30px;
   height: 30px;

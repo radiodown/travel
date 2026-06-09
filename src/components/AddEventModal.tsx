@@ -5,6 +5,7 @@ import GlassSelect from './GlassSelect';
 
 type Props = {
   initialEvent?: ItineraryEvent | null;
+  mode?: 'create' | 'edit';
   onClose: () => void;
   onSave: (event: ItineraryEvent) => void;
 };
@@ -47,8 +48,8 @@ function buildDescriptionValue(description?: string, note?: string) {
   return [...new Set(parts)].join('\n');
 }
 
-export default function AddEventModal({ initialEvent, onClose, onSave }: Props) {
-  const isEditing = !!initialEvent;
+export default function AddEventModal({ initialEvent, mode, onClose, onSave }: Props) {
+  const isEditing = mode ? mode === 'edit' : !!initialEvent;
   const hasInitialReservationContent = Boolean(
     initialEvent?.reservation?.label?.trim() ||
     initialEvent?.reservation?.details?.trim() ||

@@ -1,6 +1,6 @@
 @media (max-width: 860px) {
   .main-content {
-    padding: 0 28px calc(40px + var(--safe-area-bottom));
+    padding: 0 28px calc(40px + var(--safe-area-bottom) + var(--viewport-bottom-offset));
   }
 
   .resize-handle {

@@ -36,6 +36,18 @@ function App() {
     }
 
     const root = document.documentElement;
+    const supportsLvh = typeof CSS !== 'undefined' && CSS.supports('height: 100lvh');
+    const supportsDvh = typeof CSS !== 'undefined' && CSS.supports('height: 100dvh');
+
+    if (supportsLvh) {
+      root.style.removeProperty('--app-height');
+    }
+
+    if (supportsLvh && supportsDvh) {
+      root.style.removeProperty('--viewport-bottom-offset');
+      return;
+    }
+
     let frame = 0;
 
     const updateViewportMetrics = () => {
@@ -46,7 +58,10 @@ function App() {
       const viewportOffsetTop = viewport?.offsetTop ?? 0;
       const bottomOverlay = Math.max(0, layoutHeight - (viewportHeight + viewportOffsetTop));
 
-      root.style.setProperty('--app-height', `${Math.round(layoutHeight)}px`);
+      if (!supportsLvh) {
+        root.style.setProperty('--app-height', `${Math.round(layoutHeight)}px`);
+      }
+
       root.style.setProperty('--viewport-bottom-offset', `${Math.round(bottomOverlay)}px`);
     };
 
