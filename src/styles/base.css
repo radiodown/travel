@@ -1,0 +1,21 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, 'Malgun Gothic', sans-serif;
+  color: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: #f1f5f9;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+}

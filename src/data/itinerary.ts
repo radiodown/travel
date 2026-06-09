@@ -6,6 +6,11 @@ export type EventAttachment = {
   type: string;
 };
 
+export type ReservationInfo = {
+  label: string;
+  details: string;
+};
+
 export type ItineraryEvent = {
   time?: string;
   title: string;
@@ -15,6 +20,7 @@ export type ItineraryEvent = {
   coordinates?: [number, number]; // [lat, lng]
   category?: EventCategory;
   attachment?: EventAttachment;
+  reservation?: ReservationInfo;
 };
 
 export type ItineraryDay = {
@@ -24,7 +30,7 @@ export type ItineraryDay = {
   summary: string;
   events: ItineraryEvent[];
   mapHint?: string;
-  reservations?: { label: string; details: string }[];
+  reservations?: ReservationInfo[];
 };
 
 const itinerary: { days: ItineraryDay[] } = {

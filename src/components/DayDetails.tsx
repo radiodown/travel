@@ -1,4 +1,5 @@
 import type { ItineraryDay } from '../data/itinerary';
+import { getDayReservationItems } from '../utils/reservations';
 
 type Props = {
   day: ItineraryDay;
@@ -10,6 +11,8 @@ function getEventDescription(description?: string, note?: string) {
 }
 
 export default function DayDetails({ day }: Props) {
+  const reservationItems = getDayReservationItems(day);
+
   return (
     <div className="day-details">
       <div className="day-details-main">
@@ -49,9 +52,9 @@ export default function DayDetails({ day }: Props) {
         <div className="reservation-card">
           <p className="eyebrow">예약 정보</p>
           <h4>바로 확인</h4>
-          {day.reservations?.length ? (
+          {reservationItems.length ? (
             <ul>
-              {day.reservations.map((reservation, index) => (
+              {reservationItems.map((reservation, index) => (
                 <li key={`${reservation.label}-${index}`}>
                   <strong>{reservation.label}</strong>
                   <p>{reservation.details}</p>

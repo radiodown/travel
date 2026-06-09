@@ -1,5 +1,5 @@
 import { CATEGORIES, type EventCategory } from '../data/categories';
-import type { EventAttachment, ItineraryDay, ItineraryEvent } from '../data/itinerary';
+import type { EventAttachment, ItineraryDay, ItineraryEvent, ReservationInfo } from '../data/itinerary';
 
 type ItineraryExportPayload = {
   version: 1;
@@ -39,6 +39,15 @@ function parseAttachment(value: unknown): EventAttachment | undefined {
   };
 }
 
+function parseReservation(value: unknown): ReservationInfo | undefined {
+  if (!isRecord(value) || !isString(value.label) || !isString(value.details)) return undefined;
+
+  return {
+    label: value.label,
+    details: value.details,
+  };
+}
+
 function parseEvent(value: unknown): ItineraryEvent | null {
   if (!isRecord(value) || !isString(value.title)) return null;
 
@@ -58,6 +67,9 @@ function parseEvent(value: unknown): ItineraryEvent | null {
   const attachment = parseAttachment(value.attachment);
   if (attachment) event.attachment = attachment;
 
+  const reservation = parseReservation(value.reservation);
+  if (reservation) event.reservation = reservation;
+
   return event;
 }
 
@@ -65,13 +77,7 @@ function parseReservations(value: unknown): ItineraryDay['reservations'] {
   if (!Array.isArray(value)) return undefined;
 
   const reservations = value
-    .map((item) => {
-      if (!isRecord(item) || !isString(item.label) || !isString(item.details)) return null;
-      return {
-        label: item.label,
-        details: item.details,
-      };
-    })
+    .map((item) => parseReservation(item) ?? null)
     .filter((item): item is NonNullable<ItineraryDay['reservations']>[number] => item !== null);
 
   return reservations.length > 0 ? reservations : undefined;

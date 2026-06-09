@@ -1,0 +1,40 @@
+@media (max-width: 860px) {
+  .main-content {
+    padding: 0 28px 40px;
+  }
+
+  .resize-handle {
+    display: none;
+  }
+
+  .main-top {
+    padding: 24px 28px;
+  }
+
+  .schedule-nav {
+    gap: 10px;
+  }
+
+  .schedule-nav-title {
+    min-width: 0;
+  }
+
+  .schedule-transfer-message {
+    display: none;
+  }
+
+  .schedule-layout {
+    flex-direction: column;
+  }
+
+  .schedule-sidebar {
+    width: 100% !important;
+    max-height: 45vh;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .schedule-map {
+    height: 55vh;
+    flex: none;
+  }
+}

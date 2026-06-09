@@ -4,6 +4,7 @@ import { CATEGORIES } from '../data/categories';
 import MapView from '../components/MapView';
 import AddEventModal from '../components/AddEventModal';
 import { parseItineraryJson, serializeItinerary } from '../utils/itineraryJson';
+import { getDayReservationItems } from '../utils/reservations';
 
 type Props = {
   days: ItineraryDay[];
@@ -253,6 +254,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   day.events.forEach((e, i) => {
     if (e.coordinates) mapNumbers[i] = counter++;
   });
+  const reservationItems = getDayReservationItems(day);
 
   return (
     <div className="schedule-page">
@@ -472,10 +474,10 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           </button>
 
           {/* Reservations */}
-          {!!day.reservations?.length && (
+          {!!reservationItems.length && (
             <div className="sidebar-res">
               <p className="sidebar-res-label">예약 정보</p>
-              {day.reservations.map((r, i) => (
+              {reservationItems.map((r, i) => (
                 <div key={i} className="res-item">
                   <p className="res-label">{r.label}</p>
                   <p className="res-details">{r.details}</p>
@@ -506,10 +508,6 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
             const eventDescription = getEventDescription(ev.description, ev.note);
             return (
               <div className="map-toast">
-                <div
-                  className="map-toast-accent"
-                  style={{ background: cat?.color ?? '#4f46e5' }}
-                />
                 <div className="map-toast-body">
                   <div className="map-toast-top">
                     {cat && (

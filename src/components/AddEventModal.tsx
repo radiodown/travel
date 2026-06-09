@@ -43,14 +43,25 @@ function buildDescriptionValue(description?: string, note?: string) {
 
 export default function AddEventModal({ initialEvent, onClose, onSave }: Props) {
   const isEditing = !!initialEvent;
+  const hasInitialReservationContent = Boolean(
+    initialEvent?.reservation?.label?.trim() ||
+    initialEvent?.reservation?.details?.trim() ||
+    initialEvent?.attachment
+  );
+
   const [category, setCategory] = useState<EventCategory>(initialEvent?.category ?? 'sightseeing');
   const [time, setTime] = useState(initialEvent?.time ?? getCurrentTimeValue());
   const [title, setTitle] = useState(initialEvent?.title ?? '');
   const [location, setLocation] = useState(initialEvent?.location ?? '');
-  const [description, setDescription] = useState(buildDescriptionValue(initialEvent?.description, initialEvent?.note));
+  const [description, setDescription] = useState(
+    buildDescriptionValue(initialEvent?.description, initialEvent?.note)
+  );
+  const [reservationLabel, setReservationLabel] = useState(initialEvent?.reservation?.label ?? '');
+  const [reservationDetails, setReservationDetails] = useState(initialEvent?.reservation?.details ?? '');
   const [lat, setLat] = useState(formatCoordinate(initialEvent?.coordinates?.[0]));
   const [lng, setLng] = useState(formatCoordinate(initialEvent?.coordinates?.[1]));
   const [attachment, setAttachment] = useState<EventAttachment | null>(initialEvent?.attachment ?? null);
+  const [showReservationSection, setShowReservationSection] = useState(hasInitialReservationContent);
   const [geoLocating, setGeoLocating] = useState(false);
   const [geoError, setGeoError] = useState('');
 
@@ -204,6 +215,13 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
     if (description.trim()) event.description = description.trim();
     if (attachment) event.attachment = attachment;
 
+    if (reservationDetails.trim()) {
+      event.reservation = {
+        label: reservationLabel.trim() || title.trim(),
+        details: reservationDetails.trim(),
+      };
+    }
+
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
     if (!Number.isNaN(latNum) && !Number.isNaN(lngNum)) {
@@ -219,11 +237,6 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>{isEditing ? '일정 수정' : '일정 추가'}</h3>
-          <button className="modal-close" onClick={onClose} type="button">×</button>
-        </div>
-
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="field">
             <span>카테고리</span>
@@ -252,7 +265,7 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: 프라하 성 방문"
+              placeholder="예: 프라하성 방문"
               autoFocus
             />
           </label>
@@ -260,15 +273,14 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
           <label className="field">
             <span>시간</span>
             <input
+              type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              placeholder="비워두면 현재 시각"
+              step={300}
             />
           </label>
 
-          <p className="field-hint">
-            시간을 비우면 현재 시각이 저장됩니다.
-          </p>
+          <p className="field-hint">시간은 직접 입력하지 않고 선택해서 넣을 수 있습니다.</p>
 
           <label className="field">
             <span>설명</span>
@@ -285,7 +297,7 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
             {hasCoords ? (
               <div className="geo-picked">
                 <span className="geo-picked-text">
-                  ✓ 좌표 설정됨 <small>({lat}, {lng})</small>
+                  좌표 설정됨 <small>({lat}, {lng})</small>
                 </span>
                 <button type="button" className="geo-clear" onClick={clearCoords}>
                   변경
@@ -302,7 +314,7 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
                       setLocation(nextValue);
                     }}
                     onFocus={() => results.length > 0 && setShowResults(true)}
-                    placeholder="장소명을 검색하세요 (예: 프라하 성)"
+                    placeholder="주소명을 검색하세요 (예: 프라하성)"
                   />
                   <button
                     type="button"
@@ -312,10 +324,10 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
                     title="현재 위치 가져오기"
                     aria-label="현재 위치 가져오기"
                   >
-                    {geoLocating ? '…' : '📍'}
+                    {geoLocating ? '...' : 'GPS'}
                   </button>
                 </div>
-                {searching && <span className="geo-spinner">검색 중…</span>}
+                {searching && <span className="geo-spinner">검색 중...</span>}
                 {showResults && results.length > 0 && (
                   <ul className="geo-results">
                     {results.map((result, index) => (
@@ -328,35 +340,79 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
                 )}
               </div>
             )}
-            <p className="field-hint">검색창에서 장소를 입력하거나 GPS 아이콘을 눌러 현재 위치와 좌표를 설정할 수 있습니다.</p>
+            <p className="field-hint">
+              검색창에서 주소를 입력하거나 GPS 버튼을 눌러 현재 위치와 좌표를 설정할 수 있습니다.
+            </p>
             {geoError && <p className="field-error">{geoError}</p>}
           </div>
 
-          <div className="field">
-            <span>티켓 / PDF 첨부</span>
-            {attachment ? (
-              <div className="attach-chip">
-                <span className="attach-name">📎 {attachment.name}</span>
-                <button type="button" className="attach-remove" onClick={() => setAttachment(null)}>
-                  ×
-                </button>
+          <div className="reservation-section">
+            <button
+              type="button"
+              className={`reservation-section-toggle${showReservationSection ? ' open' : ''}`}
+              onClick={() => setShowReservationSection((prev) => !prev)}
+            >
+              <span>예약 섹션</span>
+              <span className="reservation-section-toggle-icon">{showReservationSection ? '-' : '+'}</span>
+            </button>
+
+            {showReservationSection && (
+              <div className="reservation-section-body">
+                <label className="field">
+                  <span>예약 이름</span>
+                  <input
+                    value={reservationLabel}
+                    onChange={(e) => setReservationLabel(e.target.value)}
+                    placeholder="예: 호텔 / 항공권 / 기차"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>예약 정보</span>
+                  <textarea
+                    value={reservationDetails}
+                    onChange={(e) => setReservationDetails(e.target.value)}
+                    placeholder="예: 체크인 시간, 예약 번호, 좌석 정보"
+                    rows={3}
+                  />
+                </label>
+
+                <p className="field-hint">
+                  예약 정보를 입력하면 아래 예약정보 영역에 함께 표시됩니다.
+                </p>
+
+                <div className="field">
+                  <span>티켓 PDF 첨부</span>
+                  {attachment ? (
+                    <div className="attach-chip">
+                      <span className="attach-name">파일 {attachment.name}</span>
+                      <button type="button" className="attach-remove" onClick={() => setAttachment(null)}>
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="attach-input">
+                      <input
+                        type="file"
+                        accept="application/pdf,image/*"
+                        onChange={handleFile}
+                        hidden
+                      />
+                      <span>파일 선택 (PDF / 이미지)</span>
+                    </label>
+                  )}
+                </div>
               </div>
-            ) : (
-              <label className="attach-input">
-                <input
-                  type="file"
-                  accept="application/pdf,image/*"
-                  onChange={handleFile}
-                  hidden
-                />
-                <span>＋ 파일 선택 (PDF / 이미지)</span>
-              </label>
             )}
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn-ghost" onClick={onClose}>취소</button>
-            <button type="submit" className="btn-primary">{isEditing ? '수정하기' : '추가하기'}</button>
+            <button type="button" className="btn-ghost" onClick={onClose}>
+              취소
+            </button>
+            <button type="submit" className="btn-primary">
+              {isEditing ? '수정하기' : '추가하기'}
+            </button>
           </div>
         </form>
       </div>
