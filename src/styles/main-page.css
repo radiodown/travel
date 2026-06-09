@@ -1,6 +1,8 @@
 .main-page {
-  position: relative;
-  height: 100%;
+  position: absolute;
+  inset: 0;
+  min-height: var(--app-height);
+  height: var(--app-height);
   overflow: hidden;
   background-size: cover;
   background-position: center;

@@ -3,6 +3,9 @@
   inset: 0;
   z-index: 0;
   overflow: hidden;
+  background: linear-gradient(180deg, #eef8ff 0%, #d5e9fb 100%);
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 .map-poi-overlay {

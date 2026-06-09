@@ -46,6 +46,8 @@ html,
 body {
   min-height: 100%;
   height: 100%;
+  overflow: hidden;
+  background: #f1f5f9;
 }
 
 /* Single full-screen fixed box. Pinning ONE stable element to the layout
@@ -54,7 +56,10 @@ body {
 #root {
   position: fixed;
   inset: 0;
+  min-height: var(--app-height);
   overflow: hidden;
+  background: #f1f5f9;
+  isolation: isolate;
 }
 
 body {
