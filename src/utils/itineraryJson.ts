@@ -1,5 +1,12 @@
 import { CATEGORIES, type EventCategory } from '../data/categories';
-import type { EventAttachment, ItineraryDay, ItineraryEvent, ReservationInfo } from '../data/itinerary';
+import type {
+  EventAttachment,
+  ItineraryDay,
+  ItineraryEvent,
+  ReservationInfo,
+  RouteTravelMode,
+  SavedRoute,
+} from '../data/itinerary';
 
 type ItineraryExportPayload = {
   version: 1;
@@ -8,6 +15,12 @@ type ItineraryExportPayload = {
 };
 
 const VALID_CATEGORIES = new Set<EventCategory>(Object.keys(CATEGORIES) as EventCategory[]);
+const VALID_ROUTE_MODES = new Set<RouteTravelMode>([
+  'TRANSIT',
+  'DRIVING',
+  'WALKING',
+  'BICYCLING',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -48,6 +61,53 @@ function parseReservation(value: unknown): ReservationInfo | undefined {
   };
 }
 
+function parseRoute(value: unknown): SavedRoute | undefined {
+  if (!isRecord(value)) return undefined;
+  if (
+    !isString(value.mode) ||
+    !VALID_ROUTE_MODES.has(value.mode as RouteTravelMode) ||
+    !isString(value.modeLabel) ||
+    !isString(value.modeIcon) ||
+    !isString(value.originTitle) ||
+    !isString(value.destinationTitle) ||
+    !isString(value.summary) ||
+    !isString(value.durationText) ||
+    typeof value.durationValue !== 'number' ||
+    !Number.isFinite(value.durationValue) ||
+    !isString(value.distanceText) ||
+    !Array.isArray(value.transitLines) ||
+    !Array.isArray(value.path)
+  ) {
+    return undefined;
+  }
+
+  const transitLines = value.transitLines.filter(isString);
+  const path = value.path.filter(isCoordinatePair);
+
+  if (transitLines.length !== value.transitLines.length || path.length === 0 || path.length !== value.path.length) {
+    return undefined;
+  }
+
+  const route: SavedRoute = {
+    mode: value.mode as RouteTravelMode,
+    modeLabel: value.modeLabel,
+    modeIcon: value.modeIcon,
+    originTitle: value.originTitle,
+    destinationTitle: value.destinationTitle,
+    summary: value.summary,
+    durationText: value.durationText,
+    durationValue: value.durationValue,
+    distanceText: value.distanceText,
+    transitLines,
+    path,
+  };
+
+  if (isString(value.departureText)) route.departureText = value.departureText;
+  if (isString(value.arrivalText)) route.arrivalText = value.arrivalText;
+
+  return route;
+}
+
 function parseEvent(value: unknown): ItineraryEvent | null {
   if (!isRecord(value) || !isString(value.title)) return null;
 
@@ -69,6 +129,9 @@ function parseEvent(value: unknown): ItineraryEvent | null {
 
   const reservation = parseReservation(value.reservation);
   if (reservation) event.reservation = reservation;
+
+  const route = parseRoute(value.route);
+  if (route) event.route = route;
 
   return event;
 }

@@ -1,6 +1,6 @@
 .main-page {
-  position: fixed;
-  inset: 0;
+  position: relative;
+  height: 100%;
   overflow: hidden;
   background-size: cover;
   background-position: center;

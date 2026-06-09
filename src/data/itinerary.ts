@@ -11,6 +11,24 @@ export type ReservationInfo = {
   details: string;
 };
 
+export type RouteTravelMode = 'TRANSIT' | 'DRIVING' | 'WALKING' | 'BICYCLING';
+
+export type SavedRoute = {
+  mode: RouteTravelMode;
+  modeLabel: string;
+  modeIcon: string;
+  originTitle: string;
+  destinationTitle: string;
+  summary: string;
+  durationText: string;
+  durationValue: number;
+  distanceText: string;
+  departureText?: string;
+  arrivalText?: string;
+  transitLines: string[];
+  path: [number, number][];
+};
+
 export type ItineraryEvent = {
   time?: string;
   title: string;
@@ -21,6 +39,7 @@ export type ItineraryEvent = {
   category?: EventCategory;
   attachment?: EventAttachment;
   reservation?: ReservationInfo;
+  route?: SavedRoute;
 };
 
 export type ItineraryDay = {

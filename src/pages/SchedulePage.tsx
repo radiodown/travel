@@ -1,8 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { ItineraryDay, ItineraryEvent } from '../data/itinerary';
+import type { ItineraryDay, ItineraryEvent, SavedRoute } from '../data/itinerary';
 import { CATEGORIES } from '../data/categories';
 import MapView from '../components/MapView';
 import AddEventModal from '../components/AddEventModal';
+import RoutePickerModal from '../components/RoutePickerModal';
+import {
+  fetchRouteOptions,
+  type RouteOption,
+  type RouteSearchOptions,
+  type TravelModeKey,
+} from '../utils/directions';
 import { parseItineraryJson, serializeItinerary } from '../utils/itineraryJson';
 import { getDayReservationItems } from '../utils/reservations';
 import { useDaysWeather } from '../hooks/useDaysWeather';
@@ -27,9 +34,74 @@ type TransferMessage = {
 
 type ToastMotion = 'default' | 'next' | 'prev';
 
+type EventContextMenu = {
+  index: number;
+  x: number;
+  y: number;
+};
+
+type RoutePickerState = {
+  originIndex: number;
+  destinationIndex: number;
+  originTitle: string;
+  destinationTitle: string;
+  originCoordinates: [number, number];
+  destinationCoordinates: [number, number];
+  mode: TravelModeKey;
+  departureTime: string;
+  transitPreference: 'FEWER_TRANSFERS' | 'LESS_WALKING';
+  loading: boolean;
+  error: string | null;
+  options: RouteOption[];
+};
+
 function getEventDescription(description?: string, note?: string) {
   const parts = [description?.trim(), note?.trim()].filter((value): value is string => !!value);
   return [...new Set(parts)].join(' · ');
+}
+
+function getRoundedTimeValue(date = new Date()) {
+  const hours = String(date.getHours()).padStart(2, '0');
+  const roundedMinutes = Math.round(date.getMinutes() / 5) * 5 % 60;
+  const minutes = String(roundedMinutes).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function getInitialRouteDepartureTime(event?: ItineraryEvent) {
+  return event?.time && /^\d{2}:\d{2}$/.test(event.time) ? event.time : getRoundedTimeValue();
+}
+
+function toLocalDateTime(date: string, time: string) {
+  if (!/^\d{2}:\d{2}$/.test(time)) return undefined;
+  const value = new Date(`${date}T${time}:00`);
+  return Number.isNaN(value.getTime()) ? undefined : value;
+}
+
+function isRouteEvent(event: ItineraryEvent): event is ItineraryEvent & { route: SavedRoute } {
+  return !!event.route && event.route.path.length > 0;
+}
+
+function isSelectableEvent(event: ItineraryEvent) {
+  return !!event.coordinates || isRouteEvent(event);
+}
+
+function getRouteSummaryText(route: SavedRoute) {
+  const timing =
+    route.departureText && route.arrivalText ? `${route.departureText} - ${route.arrivalText}` : null;
+  return [route.durationText, route.distanceText, timing].filter(Boolean).join(' 쨌 ');
+}
+
+function isSameRouteQuery(
+  current: RoutePickerState,
+  snapshot: Pick<RoutePickerState, 'originIndex' | 'destinationIndex' | 'mode' | 'departureTime' | 'transitPreference'>
+) {
+  return (
+    current.originIndex === snapshot.originIndex &&
+    current.destinationIndex === snapshot.destinationIndex &&
+    current.mode === snapshot.mode &&
+    current.departureTime === snapshot.departureTime &&
+    current.transitPreference === snapshot.transitPreference
+  );
 }
 
 export default function SchedulePage({ days, setDays, selectedDayIndex, onSelectDay, onBack }: Props) {
@@ -56,6 +128,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   );
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [contextMenu, setContextMenu] = useState<EventContextMenu | null>(null);
+  const [routePicker, setRoutePicker] = useState<RoutePickerState | null>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const transferMessageTimeoutRef = useRef<number | null>(null);
@@ -77,7 +151,100 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     setEditingEventIndex(null);
     setDraftEvent(null);
     setShowEventModal(false);
+    setContextMenu(null);
+    setRoutePicker(null);
   }, [selectEvent, selectedDayIndex]);
+
+  useEffect(() => {
+    if (!routePicker) return;
+
+    const snapshot = {
+      originIndex: routePicker.originIndex,
+      destinationIndex: routePicker.destinationIndex,
+      mode: routePicker.mode,
+      departureTime: routePicker.departureTime,
+      transitPreference: routePicker.transitPreference,
+    };
+
+    const searchOptions: RouteSearchOptions = {
+      mode: routePicker.mode,
+    };
+
+    if (routePicker.mode === 'TRANSIT') {
+      const departureTime = toLocalDateTime(day.date, routePicker.departureTime);
+      if (departureTime) {
+        searchOptions.departureTime = departureTime;
+      }
+      searchOptions.transitPreference = {
+        routingPreference: routePicker.transitPreference,
+      };
+    }
+
+    let cancelled = false;
+    setRoutePicker((prev) =>
+      prev && isSameRouteQuery(prev, snapshot) ? { ...prev, loading: true, error: null } : prev
+    );
+
+    void fetchRouteOptions(
+      routePicker.originCoordinates,
+      routePicker.destinationCoordinates,
+      searchOptions
+    )
+      .then((options) => {
+        if (cancelled) return;
+        setRoutePicker((prev) =>
+          prev && isSameRouteQuery(prev, snapshot)
+            ? {
+                ...prev,
+                loading: false,
+                options,
+                error: options.length ? null : '추가할 수 있는 경로를 찾지 못했습니다.',
+              }
+            : prev
+        );
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : '경로 검색에 실패했습니다.';
+        setRoutePicker((prev) =>
+          prev && isSameRouteQuery(prev, snapshot)
+            ? { ...prev, loading: false, error: message, options: [] }
+            : prev
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    day.date,
+    routePicker?.departureTime,
+    routePicker?.destinationCoordinates,
+    routePicker?.destinationIndex,
+    routePicker?.mode,
+    routePicker?.originCoordinates,
+    routePicker?.originIndex,
+    routePicker?.transitPreference,
+  ]);
+
+  // Dismiss the event context menu on any outside interaction or Escape
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
+    window.addEventListener('click', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [contextMenu]);
 
   useEffect(() => {
     setEditingDayTitle(false);
@@ -318,6 +485,138 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     selectEvent(null);
   };
 
+  // ── Add route to next destination (right-click context menu) ──
+  const openEventContextMenu = (eventIndex: number, x: number, y: number) => {
+    setContextMenu({ index: eventIndex, x, y });
+  };
+
+  const openRoutePicker = (originIndex: number) => {
+    setContextMenu(null);
+
+    const origin = day.events[originIndex];
+    if (!origin?.coordinates || isRouteEvent(origin)) {
+      showTransferStatus('error', '이 일정에는 위치 정보가 없어 경로를 찾을 수 없습니다.');
+      return;
+    }
+
+    const destinationIndex = day.events.findIndex(
+      (event, index) => index > originIndex && !!event.coordinates && !isRouteEvent(event)
+    );
+    if (destinationIndex === -1) {
+      showTransferStatus('error', '다음 목적지가 없어 경로를 추가할 수 없습니다.');
+      return;
+    }
+
+    const destination = day.events[destinationIndex];
+    setRoutePicker({
+      originIndex,
+      destinationIndex,
+      originTitle: origin.title,
+      destinationTitle: destination.title,
+      originCoordinates: origin.coordinates,
+      destinationCoordinates: destination.coordinates!,
+      mode: 'TRANSIT',
+      departureTime: getInitialRouteDepartureTime(origin),
+      transitPreference: 'FEWER_TRANSFERS',
+      loading: true,
+      error: null,
+      options: [],
+    });
+  };
+
+  const handleRouteModeChange = (mode: TravelModeKey) => {
+    setRoutePicker((prev) =>
+      prev
+        ? {
+            ...prev,
+            mode,
+            loading: true,
+            error: null,
+            options: [],
+          }
+        : prev
+    );
+  };
+
+  const handleRouteDepartureTimeChange = (departureTime: string) => {
+    setRoutePicker((prev) =>
+      prev
+        ? {
+            ...prev,
+            departureTime,
+            loading: true,
+            error: null,
+            options: [],
+          }
+        : prev
+    );
+  };
+
+  const handleRouteTransitPreferenceChange = (transitPreference: 'FEWER_TRANSFERS' | 'LESS_WALKING') => {
+    setRoutePicker((prev) =>
+      prev
+        ? {
+            ...prev,
+            transitPreference,
+            loading: true,
+            error: null,
+            options: [],
+          }
+        : prev
+    );
+  };
+
+  const handleSelectRoute = (option: RouteOption) => {
+    if (!routePicker) return;
+
+    const insertAt = routePicker.originIndex + 1;
+    const descriptionParts = [option.durationText, option.distanceText].filter(Boolean);
+    if (option.departureText && option.arrivalText) {
+      descriptionParts.push(`${option.departureText} - ${option.arrivalText}`);
+    }
+
+    const route: SavedRoute = {
+      mode: option.mode,
+      modeLabel: option.modeLabel,
+      modeIcon: option.modeIcon,
+      originTitle: routePicker.originTitle,
+      destinationTitle: routePicker.destinationTitle,
+      summary: option.summary,
+      durationText: option.durationText,
+      durationValue: option.durationValue,
+      distanceText: option.distanceText,
+      departureText: option.departureText,
+      arrivalText: option.arrivalText,
+      transitLines: option.transitLines,
+      path: option.path,
+    };
+
+    const routeEvent: ItineraryEvent = {
+      title: `${option.modeIcon} ${option.modeLabel} 경로`,
+      time: option.departureText ?? routePicker.departureTime,
+      location: `${routePicker.originTitle} -> ${routePicker.destinationTitle}`,
+      description: descriptionParts.join(' · '),
+      note: option.summary || undefined,
+      category: 'move',
+      route,
+    };
+
+    setDays((prev) =>
+      prev.map((d, i) =>
+        i === selectedDayIndex
+          ? {
+              ...d,
+              events: [...d.events.slice(0, insertAt), routeEvent, ...d.events.slice(insertAt)],
+            }
+          : d
+      )
+    );
+
+    setRoutePicker(null);
+    selectEvent(insertAt);
+    showTransferStatus('success', '경로를 일정에 추가했습니다.');
+  };
+
   // ── Reorder events (drag & drop) ──
   const handleReorder = (from: number, to: number) => {
     if (from === to) return;
@@ -341,7 +640,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
 
   // ── Swipe between mappable events (mobile toast) ──
   const goToAdjacentEvent = (dir: 1 | -1) => {
-    const selectable = day.events.flatMap((e, i) => (e.coordinates ? [i] : []));
+    const selectable = day.events.flatMap((event, index) => (isSelectableEvent(event) ? [index] : []));
     if (selectable.length === 0) return;
     const cur = selectedEventIndex !== null ? selectable.indexOf(selectedEventIndex) : -1;
     const next = cur === -1 ? 0 : (cur + dir + selectable.length) % selectable.length;
@@ -400,7 +699,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const mapNumbers: Record<number, number> = {};
   let counter = 1;
   day.events.forEach((e, i) => {
-    if (e.coordinates) mapNumbers[i] = counter++;
+    if (e.coordinates && !isRouteEvent(e)) mapNumbers[i] = counter++;
   });
   const reservationItems = getDayReservationItems(day);
 
@@ -422,6 +721,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           const ev = day.events[selectedEventIndex];
           const cat = ev.category ? CATEGORIES[ev.category] : null;
           const eventDescription = getEventDescription(ev.description, ev.note);
+          const routeSummary = isRouteEvent(ev) ? getRouteSummaryText(ev.route) : null;
           return (
             <div
               key={`${selectedEventIndex}-${toastMotion}`}
@@ -448,8 +748,14 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                   {ev.time && <span className="map-toast-time">{ev.time}</span>}
                 </div>
                 <h4 className="map-toast-title">{ev.title}</h4>
+                {isRouteEvent(ev) && (
+                  <p className="map-toast-route-leg">
+                    {ev.route.originTitle} <span aria-hidden="true">→</span> {ev.route.destinationTitle}
+                  </p>
+                )}
                 {ev.location && <p className="map-toast-loc">📍 {ev.location}</p>}
                 {eventDescription && <p className="map-toast-desc">{eventDescription}</p>}
+                {routeSummary && <p className="map-toast-route-meta">{routeSummary}</p>}
                 {ev.attachment && (
                   <div className="map-toast-actions">
                     <a
@@ -659,7 +965,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
             {day.events.map((event, i) => {
               const num = mapNumbers[i];
               const active = selectedEventIndex === i;
-              const clickable = !!event.coordinates;
+              const clickable = isSelectableEvent(event);
               const eventDescription = getEventDescription(event.description, event.note);
               return (
                 <li
@@ -669,6 +975,10 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                     `${dragIndex === i ? ' dragging' : ''}${overIndex === i && dragIndex !== i ? ' drag-over' : ''}`
                   }
                   onClick={() => clickable && selectEvent(active ? null : i)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    openEventContextMenu(i, e.clientX, e.clientY);
+                  }}
                   draggable
                   onDragStart={() => setDragIndex(i)}
                   onDragEnter={() => setOverIndex(i)}
@@ -702,8 +1012,23 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                       )}
                     </div>
                     <p className="ev-title">{event.title}</p>
+                    {isRouteEvent(event) && (
+                      <p className="ev-route-leg">
+                        <span>{event.route.originTitle}</span>
+                        <span className="ev-route-arrow" aria-hidden="true">→</span>
+                        <span>{event.route.destinationTitle}</span>
+                      </p>
+                    )}
                     {event.location && <p className="ev-loc">📍 {event.location}</p>}
                     {eventDescription && <p className="ev-desc">{eventDescription}</p>}
+                    {isRouteEvent(event) && (
+                      <div className="ev-route-meta">
+                        <span className="ev-route-chip">
+                          {event.route.modeIcon} {event.route.modeLabel}
+                        </span>
+                        <span className="ev-route-chip muted">{getRouteSummaryText(event.route)}</span>
+                      </div>
+                    )}
                     {event.attachment && (
                       <a
                         className="ev-attach"
@@ -771,6 +1096,54 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           onMouseDown={startResize}
         />
       </div>
+
+      {contextMenu && (() => {
+        const target = day.events[contextMenu.index];
+        const hasOrigin = !!target?.coordinates && !isRouteEvent(target);
+        const hasNextDestination = day.events.some(
+          (event, index) => index > contextMenu.index && !!event.coordinates && !isRouteEvent(event)
+        );
+        const canAddRoute = hasOrigin && hasNextDestination;
+        const disabledHint = !hasOrigin
+          ? '위치 정보가 없는 일정입니다'
+          : '다음 목적지가 없습니다';
+        return (
+          <div
+            className="event-context-menu"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="event-context-item"
+              type="button"
+              disabled={!canAddRoute}
+              onClick={() => openRoutePicker(contextMenu.index)}
+            >
+              <span className="event-context-icon" aria-hidden="true">🧭</span>
+              경로 추가
+            </button>
+            {!canAddRoute && <p className="event-context-hint">{disabledHint}</p>}
+          </div>
+        );
+      })()}
+
+      {routePicker && (
+        <RoutePickerModal
+          originTitle={routePicker.originTitle}
+          destinationTitle={routePicker.destinationTitle}
+          mode={routePicker.mode}
+          departureTime={routePicker.departureTime}
+          transitPreference={routePicker.transitPreference}
+          loading={routePicker.loading}
+          error={routePicker.error}
+          options={routePicker.options}
+          onModeChange={handleRouteModeChange}
+          onDepartureTimeChange={handleRouteDepartureTimeChange}
+          onTransitPreferenceChange={handleRouteTransitPreferenceChange}
+          onSelect={handleSelectRoute}
+          onClose={() => setRoutePicker(null)}
+        />
+      )}
 
       {showEventModal && (
         <AddEventModal

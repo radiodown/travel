@@ -4,6 +4,7 @@ import {
   APIProvider,
   Map,
   Marker,
+  Polyline,
   RenderingType,
   type MapMouseEvent,
   useMap,
@@ -32,11 +33,18 @@ const CLEAN_MAP_STYLES: google.maps.MapTypeStyle[] = [
 ];
 
 type MapCenter = { lat: number; lng: number };
+type RoutePath = [number, number][];
 
 const CENTER_EPSILON = 0.000001;
 const ZOOM_EPSILON = 0.01;
 const ACTIVE_MARKER_COLOR = '#dc2626';
 const DEFAULT_MARKER_COLOR = '#2563eb';
+const ROUTE_MODE_COLORS = {
+  TRANSIT: '#0284c7',
+  DRIVING: '#1d4ed8',
+  WALKING: '#16a34a',
+  BICYCLING: '#ea580c',
+} as const;
 
 type MapDraftEvent = ItineraryEvent & {
   coordinates: [number, number];
@@ -67,6 +75,16 @@ type PoiCandidate = {
   details: PlaceSelectionDetails;
   position: MapCenter;
 };
+
+function getRouteCenter(path: RoutePath): MapCenter | null {
+  if (path.length === 0) return null;
+  const mid = path[Math.floor(path.length / 2)];
+  return { lat: mid[0], lng: mid[1] };
+}
+
+function toPolylinePath(path: RoutePath) {
+  return path.map(([lat, lng]) => ({ lat, lng }));
+}
 
 function getShortPlaceName(label?: string) {
   if (!label) return 'Selected place';
@@ -586,6 +604,40 @@ function PoiGlassOverlay({
   );
 }
 
+function FitRouteBounds({
+  path,
+  offsetX,
+}: {
+  path: RoutePath;
+  offsetX: number;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || path.length === 0) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    path.forEach(([lat, lng]) => bounds.extend({ lat, lng }));
+
+    map.fitBounds(bounds, 84);
+
+    if (!offsetX) return;
+
+    const listener = google.maps.event.addListenerOnce(map, 'idle', () => {
+      const center = map.getCenter()?.toJSON();
+      const zoom = map.getZoom();
+      if (!center || zoom === undefined) return;
+      map.moveCamera({ center: getOffsetCenter(map, center, zoom, offsetX), zoom });
+    });
+
+    return () => {
+      google.maps.event.removeListener(listener);
+    };
+  }, [map, offsetX, path]);
+
+  return null;
+}
+
 function AnimateCamera({
   center,
   zoom,
@@ -691,7 +743,12 @@ export default function MapView({
   const hasFocusedSelectionRef = useRef(false);
   const mapped = events
     .map((e, i) => ({ event: e, origIndex: i }))
-    .filter(({ event }) => !!event.coordinates);
+    .filter(({ event }) => !!event.coordinates && !event.route);
+  const routeEvents = events
+    .map((event, index) => ({ event, index }))
+    .filter((item): item is { event: ItineraryEvent & { route: NonNullable<ItineraryEvent['route']> }; index: number } =>
+      !!item.event.route && item.event.route.path.length > 0
+    );
 
   const defaultCenter = mapped.length > 0
     ? { lat: mapped[0].event.coordinates![0], lng: mapped[0].event.coordinates![1] }
@@ -701,20 +758,27 @@ export default function MapView({
     selectedIndex !== null && events[selectedIndex]?.coordinates
       ? events[selectedIndex].coordinates!
       : null;
+  const selectedRoutePath =
+    selectedIndex !== null && events[selectedIndex]?.route?.path.length
+      ? events[selectedIndex].route!.path
+      : null;
+  const selectedRouteCenter = selectedRoutePath ? getRouteCenter(selectedRoutePath) : null;
 
   useEffect(() => {
     hasFocusedSelectionRef.current = false;
   }, [defaultCenter.lat, defaultCenter.lng]);
 
   useEffect(() => {
-    if (selectedCoord) {
+    if (selectedCoord || selectedRoutePath) {
       hasFocusedSelectionRef.current = true;
     }
-  }, [selectedCoord]);
+  }, [selectedCoord, selectedRoutePath]);
 
-  const shouldShowOverview = !selectedCoord && !hasFocusedSelectionRef.current;
+  const shouldShowOverview = !selectedCoord && !selectedRouteCenter && !hasFocusedSelectionRef.current;
   const panTarget = selectedCoord
     ? { lat: selectedCoord[0], lng: selectedCoord[1] }
+    : selectedRouteCenter
+      ? null
     : shouldShowOverview
       ? defaultCenter
       : null;
@@ -772,7 +836,7 @@ export default function MapView({
   }
 
   return (
-    <APIProvider apiKey={API_KEY}>
+    <APIProvider apiKey={API_KEY} version="beta">
       <Map
         defaultCenter={defaultCenter}
         defaultZoom={13}
@@ -786,6 +850,7 @@ export default function MapView({
       >
         <ContextMenuSelectionHandler onSelectLocation={handleMapContextMenu} />
         <AnimateCamera center={panTarget} zoom={panZoom} offsetX={visibleOffsetX} />
+        {selectedRoutePath && <FitRouteBounds path={selectedRoutePath} offsetX={visibleOffsetX} />}
         {poiCandidate && (
           <PoiGlassOverlay
             candidate={poiCandidate}
@@ -793,6 +858,25 @@ export default function MapView({
             onAddLocation={onAddLocation}
           />
         )}
+        {routeEvents.map(({ event, index }) => {
+          const active = selectedIndex === index;
+          const color = ROUTE_MODE_COLORS[event.route.mode] ?? ROUTE_MODE_COLORS.TRANSIT;
+          return (
+            <Polyline
+              key={`route-${index}`}
+              path={toPolylinePath(event.route.path)}
+              strokeColor={color}
+              strokeOpacity={active ? 0.92 : 0.42}
+              strokeWeight={active ? 6 : 4}
+              zIndex={active ? 700 : 320}
+              clickable
+              onClick={() => {
+                setPoiCandidate(null);
+                onSelectEvent(index);
+              }}
+            />
+          );
+        })}
         {mapped.map(({ event, origIndex }, nth) => {
           const active = selectedIndex === origIndex;
           const color = event.category ? CATEGORIES[event.category].color : DEFAULT_MARKER_COLOR;
