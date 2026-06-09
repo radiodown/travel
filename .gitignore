@@ -13,3 +13,4 @@ npm-debug.log*
 # Editor / OS
 .DS_Store
 .tmp/
+dist/
