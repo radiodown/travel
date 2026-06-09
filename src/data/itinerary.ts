@@ -13,6 +13,33 @@ export type ReservationInfo = {
 
 export type RouteTravelMode = 'TRANSIT' | 'DRIVING' | 'WALKING' | 'BICYCLING';
 
+export type RouteTransitPreference = 'FEWER_TRANSFERS' | 'LESS_WALKING';
+
+export type SavedRouteSegment = {
+  mode: RouteTravelMode;
+  modeLabel: string;
+  modeIcon: string;
+  durationText: string;
+  durationValue: number;
+  distanceText?: string;
+  distanceValue: number;
+  summary?: string;
+  path: [number, number][];
+  departureStop?: string;
+  arrivalStop?: string;
+  departureTimeText?: string;
+  arrivalTimeText?: string;
+  stopCount?: number;
+  lineColor?: string;
+  lineTextColor?: string;
+};
+
+export type SavedRouteTransfer = {
+  type: 'TRANSFER' | 'WALK';
+  title: string;
+  detail?: string;
+};
+
 export type SavedRoute = {
   mode: RouteTravelMode;
   modeLabel: string;
@@ -25,8 +52,27 @@ export type SavedRoute = {
   distanceText: string;
   departureText?: string;
   arrivalText?: string;
+  requestedDepartureTime?: string;
+  transitPreference?: RouteTransitPreference;
+  transferCount: number;
+  walkingDurationText?: string;
   transitLines: string[];
   path: [number, number][];
+  segments: SavedRouteSegment[];
+  transfers: SavedRouteTransfer[];
+};
+
+export type SavedFlight = {
+  originTitle: string;
+  destinationTitle: string;
+  originCoordinates: [number, number];
+  destinationCoordinates: [number, number];
+  path: [number, number][];
+  durationText: string;
+  airline?: string;
+  flightNumber?: string;
+  arrivalTimeText?: string;
+  bookingReference?: string;
 };
 
 export type ItineraryEvent = {
@@ -40,6 +86,7 @@ export type ItineraryEvent = {
   attachment?: EventAttachment;
   reservation?: ReservationInfo;
   route?: SavedRoute;
+  flight?: SavedFlight;
 };
 
 export type ItineraryDay = {

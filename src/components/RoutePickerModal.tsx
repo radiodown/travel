@@ -19,7 +19,7 @@ type Props = {
 };
 
 const MODE_OPTIONS: Array<{ mode: TravelModeKey; label: string; icon: string }> = [
-  { mode: 'TRANSIT', label: '대중교통', icon: '🚆' },
+  { mode: 'TRANSIT', label: '대중교통', icon: '🚇' },
   { mode: 'DRIVING', label: '자동차', icon: '🚗' },
   { mode: 'WALKING', label: '도보', icon: '🚶' },
   { mode: 'BICYCLING', label: '자전거', icon: '🚲' },
@@ -29,6 +29,22 @@ const TRANSIT_PREFERENCES: Array<{ key: TransitPreferenceKey; label: string; not
   { key: 'FEWER_TRANSFERS', label: '환승 적게', note: '갈아타는 횟수를 줄입니다.' },
   { key: 'LESS_WALKING', label: '도보 적게', note: '걷는 구간을 줄입니다.' },
 ];
+
+function getTransferLabel(option: RouteOption) {
+  if (option.mode !== 'TRANSIT') return null;
+  return option.transferCount > 0 ? `환승 ${option.transferCount}회` : '직행';
+}
+
+function getMetaLabels(option: RouteOption) {
+  const labels = [getTransferLabel(option)];
+  if (option.walkingDurationText) {
+    labels.push(`도보 ${option.walkingDurationText}`);
+  }
+  if (option.departureText && option.arrivalText) {
+    labels.push(`${option.departureText} - ${option.arrivalText}`);
+  }
+  return labels.filter(Boolean) as string[];
+}
 
 export default function RoutePickerModal({
   originTitle,
@@ -49,7 +65,7 @@ export default function RoutePickerModal({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal route-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>경로 추가</h3>
+          <h3>경로 저장</h3>
           <button className="modal-close" onClick={onClose} type="button" aria-label="닫기">
             ×
           </button>
@@ -133,19 +149,29 @@ export default function RoutePickerModal({
                         <span className="route-option-duration">{option.durationText}</span>
                       </span>
                       <span className="route-option-summary">{option.summary}</span>
-                      <span className="route-option-meta">
+                      <span className="route-option-meta route-option-meta-tight">
+                        {getMetaLabels(option).map((label) => (
+                          <span key={label} className="route-option-tag">
+                            {label}
+                          </span>
+                        ))}
                         {option.distanceText && (
                           <span className="route-option-distance">{option.distanceText}</span>
                         )}
-                        {option.departureText && option.arrivalText && (
-                          <span className="route-option-time">
-                            {option.departureText} - {option.arrivalText}
-                          </span>
-                        )}
                       </span>
+                      {option.transfers.length > 0 && (
+                        <span className="route-option-transfer-list">
+                          {option.transfers.slice(0, 3).map((transfer, index) => (
+                            <span key={`${transfer.type}-${transfer.title}-${index}`} className="route-option-transfer">
+                              <strong>{transfer.title}</strong>
+                              {transfer.detail && <span>{transfer.detail}</span>}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                     </span>
                     <span className="route-option-add" aria-hidden="true">
-                      ＋
+                      +
                     </span>
                   </button>
                 </li>

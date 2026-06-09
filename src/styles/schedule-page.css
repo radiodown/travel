@@ -732,12 +732,19 @@
 
 .ev-route-leg {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
   font-size: 0.74rem;
   font-weight: 700;
   color: #475569;
-  margin-bottom: 3px;
+  margin-bottom: 5px;
+}
+
+.ev-route-summary {
+  font-size: 0.74rem;
+  color: #475569;
+  line-height: 1.45;
+  margin-top: 4px;
 }
 
 .ev-route-arrow {
@@ -764,7 +771,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 7px;
+  margin-top: 6px;
 }
 
 .ev-route-chip {
@@ -780,8 +787,25 @@
   font-weight: 700;
 }
 
-.ev-route-chip.muted {
+.ev-route-transfer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.ev-route-transfer {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.72rem;
   color: #64748b;
+  line-height: 1.4;
+}
+
+.ev-route-transfer strong {
+  color: #334155;
+  font-weight: 700;
 }
 
 .sidebar-res {

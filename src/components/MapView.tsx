@@ -9,7 +9,7 @@ import {
   type MapMouseEvent,
   useMap,
 } from '@vis.gl/react-google-maps';
-import type { ItineraryEvent } from '../data/itinerary';
+import type { ItineraryEvent, SavedFlight, SavedRouteSegment } from '../data/itinerary';
 import { CATEGORIES } from '../data/categories';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
@@ -76,6 +76,28 @@ type PoiCandidate = {
   position: MapCenter;
 };
 
+type RouteTransferMarker = {
+  position: MapCenter;
+  title: string;
+  kind: 'TRANSFER' | 'WALK';
+};
+
+function createCurrentLocationSymbol(): google.maps.Symbol {
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: '#2563eb',
+    fillOpacity: 1,
+    strokeColor: '#ffffff',
+    strokeOpacity: 1,
+    strokeWeight: 3,
+    scale: 7,
+  };
+}
+
+function isFlightMovementEvent(event: ItineraryEvent): event is ItineraryEvent & { flight: SavedFlight } {
+  return !!event.flight && event.flight.path.length > 1;
+}
+
 function getRouteCenter(path: RoutePath): MapCenter | null {
   if (path.length === 0) return null;
   const mid = path[Math.floor(path.length / 2)];
@@ -84,6 +106,97 @@ function getRouteCenter(path: RoutePath): MapCenter | null {
 
 function toPolylinePath(path: RoutePath) {
   return path.map(([lat, lng]) => ({ lat, lng }));
+}
+
+function getSegmentColor(segment: SavedRouteSegment) {
+  if (segment.mode === 'TRANSIT' && segment.lineColor) {
+    return segment.lineColor;
+  }
+  return ROUTE_MODE_COLORS[segment.mode] ?? ROUTE_MODE_COLORS.TRANSIT;
+}
+
+function getWalkingDashIcons(color: string, active: boolean): google.maps.IconSequence[] {
+  return [
+    {
+      icon: {
+        path: 'M 0,-1 0,1',
+        strokeColor: color,
+        strokeOpacity: active ? 0.95 : 0.7,
+        strokeWeight: active ? 3 : 2.4,
+        scale: active ? 3.5 : 3,
+      },
+      offset: '0',
+      repeat: '12px',
+    },
+  ];
+}
+
+function getTransferMarkerSymbol(kind: RouteTransferMarker['kind']): google.maps.Symbol {
+  if (kind === 'WALK') {
+    return {
+      path: google.maps.SymbolPath.CIRCLE,
+      fillColor: '#ffffff',
+      fillOpacity: 1,
+      strokeColor: '#16a34a',
+      strokeOpacity: 1,
+      strokeWeight: 3,
+      scale: 5,
+    };
+  }
+
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: '#0f766e',
+    fillOpacity: 1,
+    strokeColor: '#ffffff',
+    strokeOpacity: 1,
+    strokeWeight: 2.5,
+    scale: 6,
+  };
+}
+
+function buildTransferMarkers(segments: SavedRouteSegment[]): RouteTransferMarker[] {
+  const markers: RouteTransferMarker[] = [];
+  let skipNextTransfer = false;
+
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+    const firstPoint = segment.path[0];
+    if (!firstPoint) continue;
+
+    if (segment.mode === 'WALKING') {
+      const previousTransit = [...segments.slice(0, index)].reverse().find((item) => item.mode === 'TRANSIT');
+      const nextTransit = segments.slice(index + 1).find((item) => item.mode === 'TRANSIT');
+
+      if (previousTransit && nextTransit) {
+        markers.push({
+          position: { lat: firstPoint[0], lng: firstPoint[1] },
+          title: `도보 ${segment.durationText}`,
+          kind: 'WALK',
+        });
+        skipNextTransfer = true;
+      }
+      continue;
+    }
+
+    if (segment.mode !== 'TRANSIT') continue;
+
+    const previousTransit = [...segments.slice(0, index)].reverse().find((item) => item.mode === 'TRANSIT');
+    if (!previousTransit) continue;
+
+    if (skipNextTransfer) {
+      skipNextTransfer = false;
+      continue;
+    }
+
+    markers.push({
+      position: { lat: firstPoint[0], lng: firstPoint[1] },
+      title: segment.departureStop ? `${segment.departureStop} 환승` : '환승',
+      kind: 'TRANSFER',
+    });
+  }
+
+  return markers;
 }
 
 function getShortPlaceName(label?: string) {
@@ -449,6 +562,129 @@ function ContextMenuSelectionHandler({
   return null;
 }
 
+function CurrentLocationControl({
+  onLocate,
+}: {
+  onLocate?: (position: MapCenter) => void;
+}) {
+  const map = useMap();
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<MapCenter | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const errorTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (errorTimeoutRef.current !== null) {
+        window.clearTimeout(errorTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!map) return;
+
+    const element = document.createElement('div');
+    element.className = 'map-control-slot';
+
+    const controls = map.controls[google.maps.ControlPosition.RIGHT_BOTTOM];
+    controls.push(element);
+    setContainer(element);
+
+    return () => {
+      for (let index = controls.getLength() - 1; index >= 0; index -= 1) {
+        if (controls.getAt(index) === element) {
+          controls.removeAt(index);
+          break;
+        }
+      }
+      setContainer((current) => (current === element ? null : current));
+      element.remove();
+    };
+  }, [map]);
+
+  const showLocationError = (message: string) => {
+    setLocationError(message);
+    if (errorTimeoutRef.current !== null) {
+      window.clearTimeout(errorTimeoutRef.current);
+    }
+    errorTimeoutRef.current = window.setTimeout(() => {
+      setLocationError(null);
+      errorTimeoutRef.current = null;
+    }, 2600);
+  };
+
+  const handleLocate = () => {
+    if (!map || locating) return;
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      showLocationError('Location unavailable');
+      return;
+    }
+
+    setLocating(true);
+    setLocationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const nextPosition = { lat: coords.latitude, lng: coords.longitude };
+        const nextZoom = Math.max(map.getZoom() ?? 13, 16);
+        setCurrentLocation(nextPosition);
+        map.moveCamera({ center: nextPosition, zoom: nextZoom });
+        onLocate?.(nextPosition);
+        setLocating(false);
+      },
+      (error) => {
+        const message =
+          error.code === error.PERMISSION_DENIED
+            ? 'Location blocked'
+            : error.code === error.TIMEOUT
+              ? 'Location timeout'
+              : 'Location failed';
+        showLocationError(message);
+        setLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 30000,
+      }
+    );
+  };
+
+  return (
+    <>
+      {currentLocation && (
+        <Marker
+          position={currentLocation}
+          zIndex={920}
+          icon={createCurrentLocationSymbol()}
+          title="Current location"
+        />
+      )}
+      {container &&
+        createPortal(
+          <div className="map-control-stack">
+            {locationError && <p className="map-control-hint">{locationError}</p>}
+            <button
+              className={`map-locate-btn${locating ? ' is-loading' : ''}`}
+              onClick={handleLocate}
+              type="button"
+              aria-label="Go to my location"
+              title="Go to my location"
+              disabled={locating}
+            >
+              <span className="map-locate-btn-icon" aria-hidden="true">
+                ◎
+              </span>
+            </button>
+          </div>,
+          container
+        )}
+    </>
+  );
+}
+
 function PoiGlassOverlay({
   candidate,
   onClose,
@@ -743,11 +979,16 @@ export default function MapView({
   const hasFocusedSelectionRef = useRef(false);
   const mapped = events
     .map((e, i) => ({ event: e, origIndex: i }))
-    .filter(({ event }) => !!event.coordinates && !event.route);
+    .filter(({ event }) => !!event.coordinates && !event.route && !event.flight);
   const routeEvents = events
     .map((event, index) => ({ event, index }))
     .filter((item): item is { event: ItineraryEvent & { route: NonNullable<ItineraryEvent['route']> }; index: number } =>
       !!item.event.route && item.event.route.path.length > 0
+    );
+  const flightEvents = events
+    .map((event, index) => ({ event, index }))
+    .filter((item): item is { event: ItineraryEvent & { flight: SavedFlight }; index: number } =>
+      isFlightMovementEvent(item.event)
     );
 
   const defaultCenter = mapped.length > 0
@@ -761,7 +1002,14 @@ export default function MapView({
   const selectedRoutePath =
     selectedIndex !== null && events[selectedIndex]?.route?.path.length
       ? events[selectedIndex].route!.path
+      : selectedIndex !== null && events[selectedIndex]?.flight?.path.length
+        ? events[selectedIndex].flight!.path
       : null;
+  const selectedRouteSegments =
+    selectedIndex !== null && events[selectedIndex]?.route?.segments?.length
+      ? events[selectedIndex].route!.segments
+      : [];
+  const selectedRouteTransferMarkers = buildTransferMarkers(selectedRouteSegments);
   const selectedRouteCenter = selectedRoutePath ? getRouteCenter(selectedRoutePath) : null;
 
   useEffect(() => {
@@ -849,6 +1097,11 @@ export default function MapView({
         style={{ width: '100%', height: '100%' }}
       >
         <ContextMenuSelectionHandler onSelectLocation={handleMapContextMenu} />
+        <CurrentLocationControl
+          onLocate={() => {
+            setPoiCandidate(null);
+          }}
+        />
         <AnimateCamera center={panTarget} zoom={panZoom} offsetX={visibleOffsetX} />
         {selectedRoutePath && <FitRouteBounds path={selectedRoutePath} offsetX={visibleOffsetX} />}
         {poiCandidate && (
@@ -858,17 +1111,17 @@ export default function MapView({
             onAddLocation={onAddLocation}
           />
         )}
-        {routeEvents.map(({ event, index }) => {
+        {flightEvents.map(({ event, index }) => {
           const active = selectedIndex === index;
-          const color = ROUTE_MODE_COLORS[event.route.mode] ?? ROUTE_MODE_COLORS.TRANSIT;
           return (
             <Polyline
-              key={`route-${index}`}
-              path={toPolylinePath(event.route.path)}
-              strokeColor={color}
-              strokeOpacity={active ? 0.92 : 0.42}
-              strokeWeight={active ? 6 : 4}
-              zIndex={active ? 700 : 320}
+              key={`flight-${index}`}
+              path={toPolylinePath(event.flight.path)}
+              geodesic
+              strokeColor="#0f766e"
+              strokeOpacity={active ? 0.88 : 0.45}
+              strokeWeight={active ? 4 : 3}
+              zIndex={active ? 680 : 280}
               clickable
               onClick={() => {
                 setPoiCandidate(null);
@@ -877,6 +1130,55 @@ export default function MapView({
             />
           );
         })}
+        {routeEvents.map(({ event, index }) => {
+          const active = selectedIndex === index;
+          const segments =
+            event.route.segments.length > 0
+              ? event.route.segments
+              : [
+                  {
+                    mode: event.route.mode,
+                    modeLabel: event.route.modeLabel,
+                    modeIcon: event.route.modeIcon,
+                    durationText: event.route.durationText,
+                    durationValue: event.route.durationValue,
+                    distanceText: event.route.distanceText,
+                    distanceValue: 0,
+                    summary: event.route.summary,
+                    path: event.route.path,
+                  },
+                ];
+
+          return segments.map((segment, segmentIndex) => {
+            const color = getSegmentColor(segment);
+            const isWalking = segment.mode === 'WALKING';
+            return (
+              <Polyline
+                key={`route-${index}-${segmentIndex}`}
+                path={toPolylinePath(segment.path)}
+                strokeColor={color}
+                strokeOpacity={isWalking ? 0 : active ? 0.92 : 0.45}
+                strokeWeight={active ? 6 : 4}
+                zIndex={active ? 700 : 320}
+                icons={isWalking ? getWalkingDashIcons(color, active) : undefined}
+                clickable
+                onClick={() => {
+                  setPoiCandidate(null);
+                  onSelectEvent(index);
+                }}
+              />
+            );
+          });
+        })}
+        {selectedRouteTransferMarkers.map((marker, index) => (
+          <Marker
+            key={`route-transfer-${index}`}
+            position={marker.position}
+            title={marker.title}
+            zIndex={860}
+            icon={getTransferMarkerSymbol(marker.kind)}
+          />
+        ))}
         {mapped.map(({ event, origIndex }, nth) => {
           const active = selectedIndex === origIndex;
           const color = event.category ? CATEGORIES[event.category].color : DEFAULT_MARKER_COLOR;

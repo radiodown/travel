@@ -3,7 +3,11 @@
 // bootstraps the google.maps namespace, so importLibrary is available once the
 // schedule page renders.
 
-import type { RouteTravelMode } from '../data/itinerary';
+import type {
+  RouteTravelMode,
+  SavedRouteSegment,
+  SavedRouteTransfer,
+} from '../data/itinerary';
 
 export type TravelModeKey = RouteTravelMode;
 
@@ -12,17 +16,18 @@ export type RouteOption = {
   mode: TravelModeKey;
   modeLabel: string;
   modeIcon: string;
-  /** Short human-readable route summary (road name or transit line list). */
   summary: string;
   durationText: string;
-  /** Duration in milliseconds, used for sorting. */
   durationValue: number;
   distanceText: string;
   departureText?: string;
   arrivalText?: string;
-  /** Transit line names for transit routes, in order. */
+  transferCount: number;
+  walkingDurationText?: string;
   transitLines: string[];
   path: [number, number][];
+  segments: SavedRouteSegment[];
+  transfers: SavedRouteTransfer[];
 };
 
 export type RouteSearchOptions = {
@@ -33,7 +38,7 @@ export type RouteSearchOptions = {
 };
 
 const MODE_META: Record<TravelModeKey, { label: string; icon: string }> = {
-  TRANSIT: { label: '대중교통', icon: '🚆' },
+  TRANSIT: { label: '대중교통', icon: '🚇' },
   DRIVING: { label: '자동차', icon: '🚗' },
   WALKING: { label: '도보', icon: '🚶' },
   BICYCLING: { label: '자전거', icon: '🚲' },
@@ -70,6 +75,10 @@ function getBrowserLanguage() {
   return navigator.language || undefined;
 }
 
+function stripHtml(value?: string | null) {
+  return value?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ?? '';
+}
+
 function formatDistanceFromMeters(distanceMeters?: number) {
   if (!Number.isFinite(distanceMeters) || !distanceMeters || distanceMeters <= 0) return '';
   if (distanceMeters < 1000) return `${Math.round(distanceMeters)} m`;
@@ -102,6 +111,42 @@ function formatTime(date?: Date | null) {
   }).format(date);
 }
 
+function toRouteTravelMode(
+  mode: google.maps.TravelModeString | null | undefined,
+  fallback: TravelModeKey
+): TravelModeKey {
+  switch (mode) {
+    case 'TRANSIT':
+    case 'DRIVING':
+    case 'WALKING':
+    case 'BICYCLING':
+      return mode;
+    default:
+      return fallback;
+  }
+}
+
+function toPath(points: google.maps.LatLngAltitude[] | undefined): [number, number][] {
+  return (points ?? []).map((point) => [point.lat, point.lng]);
+}
+
+function appendPath(
+  base: [number, number][],
+  extra: [number, number][]
+): [number, number][] {
+  if (base.length === 0) return [...extra];
+  if (extra.length === 0) return base;
+
+  const next = [...base];
+  extra.forEach(([lat, lng]) => {
+    const last = next[next.length - 1];
+    if (!last || last[0] !== lat || last[1] !== lng) {
+      next.push([lat, lng]);
+    }
+  });
+  return next;
+}
+
 function getTransitLines(route: google.maps.routes.Route): string[] {
   const seen = new Set<string>();
   const lines: string[] = [];
@@ -119,8 +164,13 @@ function getTransitLines(route: google.maps.routes.Route): string[] {
   return lines;
 }
 
-function getRoutePath(route: google.maps.routes.Route): [number, number][] {
-  return (route.path ?? []).map((point) => [point.lat, point.lng]);
+function getRoutePath(
+  route: google.maps.routes.Route,
+  segments: SavedRouteSegment[]
+): [number, number][] {
+  const path = toPath(route.path);
+  if (path.length > 0) return path;
+  return segments.reduce<[number, number][]>((acc, segment) => appendPath(acc, segment.path), []);
 }
 
 function getTransitTimes(route: google.maps.routes.Route) {
@@ -139,16 +189,227 @@ function getTransitTimes(route: google.maps.routes.Route) {
   };
 }
 
+function getStepSummary(
+  mode: TravelModeKey,
+  step: google.maps.routes.RouteLegStep
+) {
+  if (mode === 'TRANSIT') {
+    const transitLine = step.transitDetails?.transitLine;
+    const lineName = transitLine?.shortName ?? transitLine?.name ?? MODE_META[mode].label;
+    const headsign = step.transitDetails?.headsign;
+    return headsign ? `${lineName} · ${headsign}` : lineName;
+  }
+
+  const instructions = stripHtml(step.instructions);
+  if (instructions) return instructions;
+
+  return mode === 'WALKING' ? '도보 이동' : MODE_META[mode].label;
+}
+
+function createStepSegment(
+  requestedMode: TravelModeKey,
+  step: google.maps.routes.RouteLegStep
+): SavedRouteSegment {
+  const mode = toRouteTravelMode(step.travelMode, requestedMode);
+  const meta = MODE_META[mode];
+  const transitDetails = step.transitDetails;
+  const transitLine = transitDetails?.transitLine;
+  const path = toPath(step.path);
+  const durationValue = step.staticDurationMillis ?? 0;
+  const distanceValue = step.distanceMeters ?? 0;
+
+  return {
+    mode,
+    modeLabel: meta.label,
+    modeIcon: meta.icon,
+    durationText:
+      step.localizedValues?.staticDuration ??
+      formatDurationFromMillis(durationValue),
+    durationValue,
+    distanceText:
+      step.localizedValues?.distance ??
+      formatDistanceFromMeters(distanceValue),
+    distanceValue,
+    summary: getStepSummary(mode, step),
+    path,
+    departureStop: transitDetails?.departureStop?.name ?? undefined,
+    arrivalStop: transitDetails?.arrivalStop?.name ?? undefined,
+    departureTimeText: formatTime(transitDetails?.departureTime),
+    arrivalTimeText: formatTime(transitDetails?.arrivalTime),
+    stopCount: transitDetails?.stopCount || undefined,
+    lineColor: transitLine?.color ?? undefined,
+    lineTextColor: transitLine?.textColor ?? undefined,
+  };
+}
+
+function mergeSegments(
+  base: SavedRouteSegment,
+  next: SavedRouteSegment
+): SavedRouteSegment {
+  const distanceValue = base.distanceValue + next.distanceValue;
+  const durationValue = base.durationValue + next.durationValue;
+  return {
+    ...base,
+    durationValue,
+    durationText: formatDurationFromMillis(durationValue),
+    distanceValue,
+    distanceText: formatDistanceFromMeters(distanceValue),
+    summary: base.mode === 'WALKING' ? '도보 이동' : base.summary ?? next.summary,
+    path: appendPath(base.path, next.path),
+    departureStop: base.departureStop ?? next.departureStop,
+    arrivalStop: next.arrivalStop ?? base.arrivalStop,
+    departureTimeText: base.departureTimeText ?? next.departureTimeText,
+    arrivalTimeText: next.arrivalTimeText ?? base.arrivalTimeText,
+    stopCount:
+      typeof base.stopCount === 'number' || typeof next.stopCount === 'number'
+        ? (base.stopCount ?? 0) + (next.stopCount ?? 0)
+        : undefined,
+  };
+}
+
+function buildRouteSegments(
+  requestedMode: TravelModeKey,
+  route: google.maps.routes.Route
+): SavedRouteSegment[] {
+  const firstLeg = route.legs?.[0];
+  const steps = firstLeg?.steps ?? [];
+
+  if (steps.length === 0) {
+    const path = toPath(route.path);
+    if (path.length === 0) return [];
+    return [
+      {
+        mode: requestedMode,
+        modeLabel: MODE_META[requestedMode].label,
+        modeIcon: MODE_META[requestedMode].icon,
+        durationText:
+          route.localizedValues?.duration ??
+          route.localizedValues?.staticDuration ??
+          formatDurationFromMillis(route.durationMillis ?? route.staticDurationMillis ?? 0),
+        durationValue: route.durationMillis ?? route.staticDurationMillis ?? 0,
+        distanceText:
+          route.localizedValues?.distance ??
+          formatDistanceFromMeters(route.distanceMeters ?? 0),
+        distanceValue: route.distanceMeters ?? 0,
+        summary: stripHtml(route.description) || MODE_META[requestedMode].label,
+        path,
+      },
+    ];
+  }
+
+  const segments: SavedRouteSegment[] = [];
+
+  for (const step of steps) {
+    const nextSegment = createStepSegment(requestedMode, step);
+    const previous = segments[segments.length - 1];
+    const shouldMerge =
+      !!previous &&
+      previous.mode === nextSegment.mode &&
+      nextSegment.mode !== 'TRANSIT';
+
+    if (shouldMerge) {
+      segments[segments.length - 1] = mergeSegments(previous, nextSegment);
+    } else {
+      segments.push(nextSegment);
+    }
+  }
+
+  return segments.filter((segment) => segment.path.length > 0);
+}
+
+function buildRouteTransfers(
+  routeMode: TravelModeKey,
+  segments: SavedRouteSegment[]
+): SavedRouteTransfer[] {
+  if (routeMode !== 'TRANSIT') return [];
+
+  const transfers: SavedRouteTransfer[] = [];
+  let previousTransit: SavedRouteSegment | null = null;
+  let skipNextTransfer = false;
+
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+
+    if (segment.mode === 'WALKING') {
+      const previousTransitSegment = [...segments.slice(0, index)].reverse().find((item) => item.mode === 'TRANSIT');
+      const nextTransitSegment = segments.slice(index + 1).find((item) => item.mode === 'TRANSIT');
+
+      if (previousTransitSegment && nextTransitSegment) {
+        const detail = [
+          previousTransitSegment.arrivalStop,
+          nextTransitSegment.departureStop,
+        ]
+          .filter(Boolean)
+          .join(' -> ');
+
+        transfers.push({
+          type: 'WALK',
+          title: `도보 ${segment.durationText}`,
+          detail: detail || segment.summary,
+        });
+        skipNextTransfer = true;
+      }
+
+      continue;
+    }
+
+    if (segment.mode !== 'TRANSIT') continue;
+
+    if (previousTransit) {
+      if (skipNextTransfer) {
+        skipNextTransfer = false;
+      } else {
+        const stopName = segment.departureStop ?? previousTransit.arrivalStop;
+        transfers.push({
+          type: 'TRANSFER',
+          title: stopName ? `${stopName} 환승` : '환승',
+          detail: [previousTransit.summary, segment.summary].filter(Boolean).join(' -> ') || undefined,
+        });
+      }
+    }
+
+    previousTransit = segment;
+  }
+
+  return transfers;
+}
+
+function getWalkingDurationText(
+  routeMode: TravelModeKey,
+  segments: SavedRouteSegment[]
+) {
+  if (routeMode !== 'TRANSIT') return undefined;
+
+  const walkingMillis = segments
+    .filter((segment) => segment.mode === 'WALKING')
+    .reduce((sum, segment) => sum + segment.durationValue, 0);
+
+  return walkingMillis > 0 ? formatDurationFromMillis(walkingMillis) : undefined;
+}
+
+function getTransferCount(
+  routeMode: TravelModeKey,
+  segments: SavedRouteSegment[]
+) {
+  if (routeMode !== 'TRANSIT') return 0;
+  const transitSegments = segments.filter((segment) => segment.mode === 'TRANSIT').length;
+  return Math.max(0, transitSegments - 1);
+}
+
 function getRouteSummary(
   mode: TravelModeKey,
   route: google.maps.routes.Route,
+  segments: SavedRouteSegment[],
   transitLines: string[]
 ) {
   if (mode === 'TRANSIT' && transitLines.length > 0) {
     return transitLines.join(' · ');
   }
 
-  const description = route.description?.trim();
+  const firstSegmentSummary = segments.find((segment) => segment.summary)?.summary;
+  if (firstSegmentSummary) return firstSegmentSummary;
+
+  const description = stripHtml(route.description);
   if (description) return description;
 
   if (transitLines.length > 0) {
@@ -165,7 +426,9 @@ function toRouteOption(
 ): RouteOption {
   const meta = MODE_META[mode];
   const firstLeg = route.legs?.[0];
+  const segments = buildRouteSegments(mode, route);
   const transitLines = getTransitLines(route);
+  const transfers = buildRouteTransfers(mode, segments);
   const { departureText, arrivalText } = getTransitTimes(route);
   const durationValue =
     route.durationMillis ??
@@ -174,14 +437,14 @@ function toRouteOption(
     firstLeg?.staticDurationMillis ??
     Number.MAX_SAFE_INTEGER;
   const distanceMeters = route.distanceMeters ?? firstLeg?.distanceMeters;
-  const path = getRoutePath(route);
+  const path = getRoutePath(route, segments);
 
   return {
     id: `${mode}-${index}-${route.routeLabels?.join('-') ?? 'route'}`,
     mode,
     modeLabel: meta.label,
     modeIcon: meta.icon,
-    summary: getRouteSummary(mode, route, transitLines),
+    summary: getRouteSummary(mode, route, segments, transitLines),
     durationText:
       route.localizedValues?.duration ??
       route.localizedValues?.staticDuration ??
@@ -195,8 +458,12 @@ function toRouteOption(
       formatDistanceFromMeters(distanceMeters),
     departureText,
     arrivalText,
+    transferCount: getTransferCount(mode, segments),
+    walkingDurationText: getWalkingDurationText(mode, segments),
     transitLines,
     path,
+    segments,
+    transfers,
   };
 }
 
@@ -250,13 +517,13 @@ function describeConfigStatus(status: string): string {
     case 'FAILED_PRECONDITION':
     case 'PERMISSION_DENIED':
     case 'REQUEST_DENIED':
-      return 'Routes API가 거부되었습니다. Google Cloud에서 Routes API를 활성화하고 API 키 제한을 확인하세요.';
+      return 'Routes API가 거부되었습니다. Google Cloud에서 Routes API와 API 키 제한을 확인하세요.';
     case 'RESOURCE_EXHAUSTED':
     case 'OVER_QUERY_LIMIT':
     case 'OVER_DAILY_LIMIT':
       return 'Routes API 사용량 또는 결제 한도를 초과했습니다. Google Cloud 결제와 쿼터를 확인하세요.';
     case 'INVALID_ARGUMENT':
-      return 'Routes API 요청이 잘못되었습니다. Routes beta 채널과 요청 파라미터를 확인하세요.';
+      return 'Routes API 요청이 올바르지 않습니다. 요청 파라미터와 beta 채널 설정을 확인하세요.';
     case 'UNIMPLEMENTED':
       return '현재 로드된 Maps JavaScript API 채널에서 Route 클래스가 지원되지 않습니다. beta 채널 설정을 확인하세요.';
     case 'UNAVAILABLE':
