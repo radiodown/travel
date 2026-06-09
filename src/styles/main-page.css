@@ -1,5 +1,6 @@
 .main-page {
-  height: 100vh;
+  min-height: var(--app-height);
+  height: var(--app-height);
   overflow: hidden;
   position: relative;
   background-size: cover;
@@ -25,7 +26,7 @@
 .main-top {
   position: relative;
   z-index: 1;
-  padding: 32px 40px;
+  padding: calc(32px + var(--safe-area-top)) 40px 32px;
 }
 
 .main-badge {
@@ -44,7 +45,7 @@
 .main-content {
   position: relative;
   z-index: 1;
-  padding: 0 48px 52px;
+  padding: 0 48px calc(52px + var(--safe-area-bottom));
   max-width: 900px;
 }
 

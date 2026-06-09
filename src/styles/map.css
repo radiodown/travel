@@ -36,7 +36,7 @@
 .map-toast {
   position: absolute;
   left: calc(50% + var(--toast-shift, 0px));
-  bottom: 24px;
+  bottom: calc(24px + var(--safe-area-bottom) + var(--viewport-bottom-offset));
   transform: translateX(-50%);
   z-index: 400;
   width: min(440px, calc(100% - 40px));
@@ -57,11 +57,26 @@
     inset 0 -1px 1px rgba(255, 255, 255, 0.35);
   display: flex;
   overflow: hidden;
-  animation: toastUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  animation-duration: 0.26s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
   /* Long-press to edit: avoid text selection / iOS callout while holding */
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  will-change: transform, opacity;
+}
+
+.map-toast.toast-motion-default {
+  animation-name: toastUp;
+}
+
+.map-toast.toast-motion-next {
+  animation-name: toastSlideFromRight;
+}
+
+.map-toast.toast-motion-prev {
+  animation-name: toastSlideFromLeft;
 }
 
 /* iOS-26 style specular highlight across the top */
@@ -88,6 +103,30 @@
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes toastSlideFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-50% + 28px)) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+@keyframes toastSlideFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-50% - 28px)) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
   }
 }
 
@@ -205,6 +244,19 @@
 .map-toast-close:hover {
   background: #f1f5f9;
   color: #475569;
+}
+
+@media (max-width: 860px) {
+  .map-toast {
+    bottom: calc(36px + var(--safe-area-bottom) + var(--viewport-bottom-offset));
+    width: min(440px, calc(100% - 24px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-toast {
+    animation-duration: 0.01ms;
+  }
 }
 
 .map-no-key {

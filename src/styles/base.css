@@ -1,6 +1,12 @@
 :root {
   font-family: Inter, system-ui, -apple-system, 'Malgun Gothic', sans-serif;
   color: #0f172a;
+  --app-height: 100vh;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --viewport-bottom-offset: 0px;
 
   /* ──────────────────────────────────────────────
      Theme accent — change ONLY this one color to
@@ -18,14 +24,33 @@
   --accent-tint-3: color-mix(in srgb, var(--accent) 30%, white);  /* light border tint */
 }
 
+@supports (height: 100svh) {
+  :root {
+    --app-height: 100svh;
+  }
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-height: 100dvh;
+  }
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+  height: 100%;
+}
+
 body {
-  min-height: 100vh;
+  min-height: var(--app-height);
   background: #f1f5f9;
 }
 

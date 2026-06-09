@@ -31,6 +31,52 @@ function App() {
   const [days, setDays] = useState<ItineraryDay[]>(() => getInitialDays());
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const root = document.documentElement;
+    let frame = 0;
+
+    const updateViewportMetrics = () => {
+      frame = 0;
+      const viewport = window.visualViewport;
+      const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
+      const viewportHeight = viewport?.height ?? layoutHeight;
+      const viewportOffsetTop = viewport?.offsetTop ?? 0;
+      const bottomOverlay = Math.max(0, layoutHeight - (viewportHeight + viewportOffsetTop));
+
+      root.style.setProperty('--app-height', `${Math.round(layoutHeight)}px`);
+      root.style.setProperty('--viewport-bottom-offset', `${Math.round(bottomOverlay)}px`);
+    };
+
+    const scheduleViewportUpdate = () => {
+      if (frame !== 0) {
+        window.cancelAnimationFrame(frame);
+      }
+      frame = window.requestAnimationFrame(updateViewportMetrics);
+    };
+
+    scheduleViewportUpdate();
+
+    const viewport = window.visualViewport;
+    window.addEventListener('resize', scheduleViewportUpdate);
+    window.addEventListener('orientationchange', scheduleViewportUpdate);
+    viewport?.addEventListener('resize', scheduleViewportUpdate);
+    viewport?.addEventListener('scroll', scheduleViewportUpdate);
+
+    return () => {
+      if (frame !== 0) {
+        window.cancelAnimationFrame(frame);
+      }
+      window.removeEventListener('resize', scheduleViewportUpdate);
+      window.removeEventListener('orientationchange', scheduleViewportUpdate);
+      viewport?.removeEventListener('resize', scheduleViewportUpdate);
+      viewport?.removeEventListener('scroll', scheduleViewportUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
     if (days.length === 0) {
       setSelectedDayIndex(0);
       return;

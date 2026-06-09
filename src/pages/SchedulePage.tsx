@@ -24,6 +24,8 @@ type TransferMessage = {
   text: string;
 };
 
+type ToastMotion = 'default' | 'next' | 'prev';
+
 function getEventDescription(description?: string, note?: string) {
   const parts = [description?.trim(), note?.trim()].filter((value): value is string => !!value);
   return [...new Set(parts)].join(' · ');
@@ -31,6 +33,7 @@ function getEventDescription(description?: string, note?: string) {
 
 export default function SchedulePage({ days, setDays, selectedDayIndex, onSelectDay, onBack }: Props) {
   const [selectedEventIndex, setSelectedEventIndex] = useState<number | null>(null);
+  const [toastMotion, setToastMotion] = useState<ToastMotion>('default');
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEventIndex, setEditingEventIndex] = useState<number | null>(null);
   const [editingDayTitle, setEditingDayTitle] = useState(false);
@@ -57,12 +60,17 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const editingEvent = editingEventIndex !== null ? day.events[editingEventIndex] : null;
   const daysWeather = useDaysWeather(days);
 
+  const selectEvent = useCallback((index: number | null, motion: ToastMotion = 'default') => {
+    setToastMotion(motion);
+    setSelectedEventIndex(index);
+  }, []);
+
   // Reset selected event when day changes
   useEffect(() => {
-    setSelectedEventIndex(null);
+    selectEvent(null);
     setEditingEventIndex(null);
     setShowEventModal(false);
-  }, [selectedDayIndex]);
+  }, [selectEvent, selectedDayIndex]);
 
   useEffect(() => {
     setEditingDayTitle(false);
@@ -150,7 +158,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     );
 
     if (editingEventIndex !== null) {
-      setSelectedEventIndex(editingEventIndex);
+      selectEvent(editingEventIndex);
     }
   };
 
@@ -263,7 +271,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
 
       setDays(importedDays);
       onSelectDay(0);
-      setSelectedEventIndex(null);
+      selectEvent(null);
       setEditingEventIndex(null);
       setShowEventModal(false);
       showTransferStatus('success', `${importedDays.length}일 일정 데이터를 불러왔습니다.`);
@@ -283,7 +291,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           : d
       )
     );
-    setSelectedEventIndex(null);
+    selectEvent(null);
   };
 
   // ── Reorder events (drag & drop) ──
@@ -298,7 +306,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
         return { ...d, events };
       })
     );
-    setSelectedEventIndex(null);
+    selectEvent(null);
   };
 
   const handleDrop = (to: number) => {
@@ -313,7 +321,9 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     if (selectable.length === 0) return;
     const cur = selectedEventIndex !== null ? selectable.indexOf(selectedEventIndex) : -1;
     const next = cur === -1 ? 0 : (cur + dir + selectable.length) % selectable.length;
-    setSelectedEventIndex(selectable[next]);
+    const nextIndex = selectable[next];
+    if (nextIndex === selectedEventIndex) return;
+    selectEvent(nextIndex, dir === 1 ? 'next' : 'prev');
   };
 
   const clearLongPress = () => {
@@ -377,7 +387,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
         <MapView
           events={day.events}
           selectedIndex={selectedEventIndex}
-          onSelectEvent={(i) => setSelectedEventIndex(selectedEventIndex === i ? null : i)}
+          onSelectEvent={(i) => selectEvent(selectedEventIndex === i ? null : i)}
           visibleOffsetX={visibleOffsetX}
         />
 
@@ -388,8 +398,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           const eventDescription = getEventDescription(ev.description, ev.note);
           return (
             <div
-              key={selectedEventIndex}
-              className="map-toast"
+              key={`${selectedEventIndex}-${toastMotion}`}
+              className={`map-toast toast-motion-${toastMotion}`}
               style={{ ['--toast-shift' as string]: `${visibleOffsetX}px` } as React.CSSProperties}
               onTouchStart={handleToastTouchStart}
               onTouchMove={handleToastTouchMove}
@@ -430,7 +440,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
               </div>
               <button
                 className="map-toast-close"
-                onClick={() => setSelectedEventIndex(null)}
+                onClick={() => selectEvent(null)}
                 type="button"
               >
                 ×
@@ -622,7 +632,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                     `sidebar-event${active ? ' active' : ''}${clickable ? ' clickable' : ''}` +
                     `${dragIndex === i ? ' dragging' : ''}${overIndex === i && dragIndex !== i ? ' drag-over' : ''}`
                   }
-                  onClick={() => clickable && setSelectedEventIndex(active ? null : i)}
+                  onClick={() => clickable && selectEvent(active ? null : i)}
                   draggable
                   onDragStart={() => setDragIndex(i)}
                   onDragEnter={() => setOverIndex(i)}

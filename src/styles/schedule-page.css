@@ -2,7 +2,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: var(--app-height);
+  height: var(--app-height);
   overflow: hidden;
 }
 
@@ -19,11 +20,11 @@
   box-shadow:
     0 4px 24px rgba(15, 23, 42, 0.1),
     inset 0 1px 1px rgba(255, 255, 255, 0.8);
-  padding: 0 20px;
+  padding: var(--safe-area-top) 20px 0;
   display: flex;
   align-items: center;
   gap: 14px;
-  height: 56px;
+  height: calc(56px + var(--safe-area-top));
 }
 
 .back-btn {

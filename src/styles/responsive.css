@@ -1,6 +1,6 @@
 @media (max-width: 860px) {
   .main-content {
-    padding: 0 28px 40px;
+    padding: 0 28px calc(40px + var(--safe-area-bottom));
   }
 
   .resize-handle {
@@ -8,7 +8,7 @@
   }
 
   .main-top {
-    padding: 24px 28px;
+    padding: calc(24px + var(--safe-area-top)) 28px 24px;
   }
 
   .schedule-nav {
