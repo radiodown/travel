@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EventAttachment, ItineraryEvent } from '../data/itinerary';
 import { CATEGORIES, CATEGORY_ORDER, type EventCategory } from '../data/categories';
+import GlassSelect from './GlassSelect';
 
 type Props = {
   initialEvent?: ItineraryEvent | null;
@@ -23,9 +24,14 @@ type ReverseGeoResult = {
 function getCurrentTimeValue() {
   const now = new Date();
   const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
+  // Snap to the nearest 5-minute step so it matches the dropdown options
+  const roundedMinutes = Math.round(now.getMinutes() / 5) * 5 % 60;
+  const minutes = String(roundedMinutes).padStart(2, '0');
   return `${hours}:${minutes}`;
 }
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
 
 function getShortPlaceName(label?: string) {
   if (!label) return '현재 위치';
@@ -271,15 +277,24 @@ export default function AddEventModal({ initialEvent, onClose, onSave }: Props) 
               />
             </label>
 
-            <label className="field field-time">
+            <div className="field field-time">
               <span>시간</span>
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                step={300}
-              />
-            </label>
+              <div className="time-selects">
+                <GlassSelect
+                  value={time.split(':')[0] ?? '00'}
+                  options={HOUR_OPTIONS}
+                  onChange={(h) => setTime(`${h}:${time.split(':')[1] ?? '00'}`)}
+                  ariaLabel="시"
+                />
+                <span className="time-colon">:</span>
+                <GlassSelect
+                  value={time.split(':')[1] ?? '00'}
+                  options={MINUTE_OPTIONS}
+                  onChange={(m) => setTime(`${time.split(':')[0] ?? '00'}:${m}`)}
+                  ariaLabel="분"
+                />
+              </div>
+            </div>
           </div>
           <label className="field">
             <span>설명</span>
