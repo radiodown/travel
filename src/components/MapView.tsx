@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   APIProvider,
   Map,
@@ -10,23 +10,176 @@ import { CATEGORIES } from '../data/categories';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
-function PanTo({
+type MapCenter = { lat: number; lng: number };
+
+const CENTER_EPSILON = 0.000001;
+const ZOOM_EPSILON = 0.01;
+
+function lerp(start: number, end: number, t: number) {
+  return start + (end - start) * t;
+}
+
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function normalizeLng(value: number) {
+  return ((value + 540) % 360) - 180;
+}
+
+function getLngDelta(from: number, to: number) {
+  return normalizeLng(to - from);
+}
+
+function interpolateCenter(from: MapCenter, to: MapCenter, t: number): MapCenter {
+  return {
+    lat: lerp(from.lat, to.lat, t),
+    lng: normalizeLng(from.lng + getLngDelta(from.lng, to.lng) * t),
+  };
+}
+
+function areCentersClose(a: MapCenter, b: MapCenter) {
+  return (
+    Math.abs(a.lat - b.lat) < CENTER_EPSILON &&
+    Math.abs(getLngDelta(a.lng, b.lng)) < CENTER_EPSILON
+  );
+}
+
+function haversineKm(a: MapCenter, b: MapCenter) {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const latDelta = toRad(b.lat - a.lat);
+  const lngDelta = toRad(getLngDelta(a.lng, b.lng));
+  const startLat = toRad(a.lat);
+  const endLat = toRad(b.lat);
+  const h =
+    Math.sin(latDelta / 2) ** 2 +
+    Math.cos(startLat) * Math.cos(endLat) * Math.sin(lngDelta / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function getAnimationDurationMs(distanceKm: number, zoomDelta: number) {
+  const distanceWeight = distanceKm > 0 ? Math.log2(distanceKm + 1) * 140 : 0;
+  const zoomWeight = zoomDelta * 60;
+  return Math.max(380, Math.min(1400, 320 + distanceWeight + zoomWeight));
+}
+
+function getFlightMidZoom(startZoom: number, endZoom: number, distanceKm: number) {
+  if (distanceKm < 8) return null;
+  const lift = Math.min(7, Math.max(1.5, Math.log2(distanceKm + 1) * 0.7));
+  const midZoom = Math.max(4, Math.min(startZoom, endZoom) - lift);
+  return midZoom < Math.min(startZoom, endZoom) - 0.35 ? midZoom : null;
+}
+
+function getFrameZoom(startZoom: number, endZoom: number, midZoom: number | null, t: number) {
+  if (midZoom === null) {
+    return lerp(startZoom, endZoom, easeInOutCubic(t));
+  }
+
+  if (t < 0.5) {
+    return lerp(startZoom, midZoom, easeInOutCubic(t * 2));
+  }
+
+  return lerp(midZoom, endZoom, easeInOutCubic((t - 0.5) * 2));
+}
+
+function getOffsetCenter(
+  map: google.maps.Map,
+  center: MapCenter,
+  zoom: number,
+  offsetX: number
+): MapCenter {
+  if (!offsetX) return center;
+  const projection = map.getProjection();
+  if (!projection) return center;
+
+  const point = projection.fromLatLngToPoint(center);
+  if (!point) return center;
+
+  const scale = 2 ** zoom;
+  return projection
+    .fromPointToLatLng(new google.maps.Point(point.x - offsetX / scale, point.y), true)
+    .toJSON();
+}
+
+function AnimateCamera({
   center,
   zoom,
   offsetX,
 }: {
-  center: { lat: number; lng: number };
+  center: MapCenter;
   zoom: number;
   offsetX: number;
 }) {
   const map = useMap();
+  const frameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!map) return;
-    map.setZoom(zoom);
-    map.panTo(center);
-    // Shift the target into the visible area (right of the floating sidebar)
-    if (offsetX) map.panBy(-offsetX, 0);
-  }, [center, zoom, offsetX, map]);
+
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+
+    const nextCenter = getOffsetCenter(map, center, zoom, offsetX);
+    const currentCenter = map.getCenter()?.toJSON();
+    const currentZoom = map.getZoom();
+
+    if (!currentCenter || currentZoom === undefined) {
+      map.moveCamera({ center: nextCenter, zoom });
+      return;
+    }
+
+    if (
+      areCentersClose(currentCenter, nextCenter) &&
+      Math.abs(currentZoom - zoom) < ZOOM_EPSILON
+    ) {
+      return;
+    }
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      map.moveCamera({ center: nextCenter, zoom });
+      return;
+    }
+
+    // panTo animates only short hops, so drive long camera moves ourselves.
+    const distanceKm = haversineKm(currentCenter, nextCenter);
+    const durationMs = getAnimationDurationMs(distanceKm, Math.abs(currentZoom - zoom));
+    const midZoom = getFlightMidZoom(currentZoom, zoom, distanceKm);
+    const startedAt = performance.now();
+
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / durationMs);
+      map.moveCamera({
+        center: interpolateCenter(currentCenter, nextCenter, easeInOutCubic(progress)),
+        zoom: getFrameZoom(currentZoom, zoom, midZoom, progress),
+      });
+
+      if (progress < 1) {
+        frameRef.current = window.requestAnimationFrame(animate);
+      } else {
+        frameRef.current = null;
+      }
+    };
+
+    frameRef.current = window.requestAnimationFrame(animate);
+
+    return () => {
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
+  }, [center.lat, center.lng, zoom, offsetX, map]);
+
   return null;
 }
 
@@ -83,7 +236,7 @@ export default function MapView({ events, selectedIndex, onSelectEvent, visibleO
         disableDefaultUI={true}
         style={{ width: '100%', height: '100%' }}
       >
-        <PanTo center={panTarget} zoom={panZoom} offsetX={visibleOffsetX} />
+        <AnimateCamera center={panTarget} zoom={panZoom} offsetX={visibleOffsetX} />
         {mapped.map(({ event, origIndex }, nth) => {
           const active = selectedIndex === origIndex;
           const color = event.category ? CATEGORIES[event.category].color : 'var(--accent)';
