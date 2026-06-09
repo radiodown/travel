@@ -504,6 +504,8 @@
   transition: opacity 0.15s, color 0.15s;
   user-select: none;
   margin-left: -4px;
+  padding: 8px 6px;
+  touch-action: none;
 }
 
 .sidebar-event:hover .ev-drag {
@@ -516,6 +518,12 @@
 
 .ev-drag:active {
   cursor: grabbing;
+}
+
+@media (hover: none) {
+  .ev-drag {
+    opacity: 1;
+  }
 }
 
 .ev-actions {

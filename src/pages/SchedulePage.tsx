@@ -35,6 +35,19 @@ type TransferMessage = {
 
 type ToastMotion = 'default' | 'next' | 'prev';
 
+type EventContextMenu = {
+  eventIndex: number;
+  x: number;
+  y: number;
+  label: '경로 추가' | '경로 다시 찾기';
+  kind: 'create' | 'edit';
+  draft?: {
+    originIndex: number;
+    destinationIndex: number;
+    departureTime: string;
+  };
+};
+
 type RoutePickerState = {
   originIndex: number;
   destinationIndex: number;
@@ -237,6 +250,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   );
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [contextMenu, setContextMenu] = useState<EventContextMenu | null>(null);
   const [routePicker, setRoutePicker] = useState<RoutePickerState | null>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -244,6 +258,13 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const toastTouchStartX = useRef<number | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
+  const eventLongPressTimer = useRef<number | null>(null);
+  const eventLongPressFired = useRef(false);
+  const eventTouchStartPoint = useRef<{ x: number; y: number } | null>(null);
+  const touchDragOriginIndex = useRef<number | null>(null);
+  const touchDragOverIndex = useRef<number | null>(null);
+  const touchDragging = useRef(false);
+  const suppressSidebarClick = useRef(false);
   const day = days[selectedDayIndex];
   const editingEvent = editingEventIndex !== null ? day.events[editingEventIndex] : null;
   const daysWeather = useDaysWeather(days);
@@ -258,6 +279,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     setEditingEventIndex(null);
     setDraftEvent(null);
     setShowEventModal(false);
+    setContextMenu(null);
     setRoutePicker(null);
   }, [selectEvent, selectedDayIndex]);
 
@@ -354,8 +376,34 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
       if (longPressTimer.current !== null) {
         window.clearTimeout(longPressTimer.current);
       }
+      if (eventLongPressTimer.current !== null) {
+        window.clearTimeout(eventLongPressTimer.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const close = () => setContextMenu(null);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener('click', close);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [contextMenu]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -748,7 +796,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     );
   };
 
-  const handleReorder = (from: number, to: number) => {
+  const handleReorder = useCallback((from: number, to: number) => {
     if (from === to) return;
     setDays((prev) =>
       prev.map((currentDay, index) => {
@@ -760,13 +808,35 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
       })
     );
     selectEvent(null);
-  };
+  }, [selectEvent, selectedDayIndex, setDays]);
 
   const handleDrop = (to: number) => {
     if (dragIndex !== null) handleReorder(dragIndex, to);
     setDragIndex(null);
     setOverIndex(null);
   };
+
+  const clampContextMenuPosition = useCallback((x: number, y: number) => {
+    if (typeof window === 'undefined') return { x, y };
+
+    const menuWidth = 188;
+    const menuHeight = 64;
+    const margin = 12;
+
+    return {
+      x: Math.min(x, window.innerWidth - menuWidth - margin),
+      y: Math.min(y, window.innerHeight - menuHeight - margin),
+    };
+  }, []);
+
+  const findSidebarEventIndexAtPoint = useCallback((x: number, y: number) => {
+    if (typeof document === 'undefined') return null;
+    const element = document.elementFromPoint(x, y) as HTMLElement | null;
+    const item = element?.closest<HTMLElement>('[data-event-index]');
+    if (!item) return null;
+    const value = Number(item.dataset.eventIndex);
+    return Number.isInteger(value) ? value : null;
+  }, []);
 
   const getRouteDraftFromListIndex = useCallback(
     (eventIndex: number) => {
@@ -824,9 +894,66 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     [day.events]
   );
 
+  const openEventContextMenu = useCallback(
+    (eventIndex: number, x: number, y: number) => {
+      const event = day.events[eventIndex];
+      if (!event) return;
+
+      const position = clampContextMenuPosition(x, y);
+
+      if (isRouteEvent(event)) {
+        setContextMenu({
+          eventIndex,
+          x: position.x,
+          y: position.y,
+          label: '경로 다시 찾기',
+          kind: 'edit',
+        });
+        return;
+      }
+
+      const draft = getRouteDraftFromListIndex(eventIndex);
+      if (!draft) {
+        showTransferStatus('error', '경로 앞뒤에 위치가 있는 일반 일정이 필요합니다.');
+        return;
+      }
+
+      setContextMenu({
+        eventIndex,
+        x: position.x,
+        y: position.y,
+        label: '경로 추가',
+        kind: 'create',
+        draft,
+      });
+    },
+    [clampContextMenuPosition, day.events, getRouteDraftFromListIndex, showTransferStatus]
+  );
+
+  const handleContextMenuAction = useCallback(() => {
+    if (!contextMenu) return;
+
+    const menu = contextMenu;
+    setContextMenu(null);
+
+    if (menu.kind === 'edit') {
+      openEditModal(menu.eventIndex);
+      return;
+    }
+
+    if (!menu.draft) return;
+    setShowEventModal(false);
+    setEditingEventIndex(null);
+    setDraftEvent(null);
+    buildRoutePickerState(menu.draft);
+  }, [buildRoutePickerState, contextMenu]);
+
   const handleEventContextMenu = (e: React.MouseEvent, eventIndex: number) => {
     e.preventDefault();
     e.stopPropagation();
+    openEventContextMenu(eventIndex, e.clientX, e.clientY);
+    return;
+    /*
 
     const event = day.events[eventIndex];
     if (!event) return;
@@ -846,6 +973,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     setEditingEventIndex(null);
     setDraftEvent(null);
     buildRoutePickerState(draft);
+    */
   };
 
   const goToAdjacentEvent = (dir: 1 | -1) => {
@@ -901,6 +1029,138 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const handleToastMouseDown = () => startLongPress();
   const handleToastMouseUp = () => clearLongPress();
   const handleToastMouseLeave = () => clearLongPress();
+
+  const clearEventLongPress = () => {
+    if (eventLongPressTimer.current !== null) {
+      window.clearTimeout(eventLongPressTimer.current);
+      eventLongPressTimer.current = null;
+    }
+  };
+
+  const startEventLongPress = (eventIndex: number, x: number, y: number) => {
+    eventLongPressFired.current = false;
+    eventTouchStartPoint.current = { x, y };
+    clearEventLongPress();
+    eventLongPressTimer.current = window.setTimeout(() => {
+      eventLongPressFired.current = true;
+      selectEvent(eventIndex);
+      openEventContextMenu(eventIndex, x, y);
+    }, 520);
+  };
+
+  const handleSidebarEventTouchStart = (e: React.TouchEvent, eventIndex: number) => {
+    if (e.touches.length !== 1) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('.ev-drag')) {
+      handleTouchDragStart(e, eventIndex);
+      return;
+    }
+    const touch = e.touches[0];
+    startEventLongPress(eventIndex, touch.clientX, touch.clientY);
+  };
+
+  const handleSidebarEventTouchMove = (e: React.TouchEvent) => {
+    if (touchDragging.current) return;
+    if (!eventTouchStartPoint.current) return;
+    const touch = e.touches[0];
+    if (
+      Math.abs(touch.clientX - eventTouchStartPoint.current.x) > 10 ||
+      Math.abs(touch.clientY - eventTouchStartPoint.current.y) > 10
+    ) {
+      clearEventLongPress();
+    }
+  };
+
+  const handleSidebarEventTouchEnd = () => {
+    if (touchDragging.current) return;
+    clearEventLongPress();
+    eventTouchStartPoint.current = null;
+  };
+
+  const finishTouchDrag = useCallback(
+    (commit: boolean) => {
+      const from = touchDragOriginIndex.current;
+      const to = touchDragOverIndex.current;
+
+      touchDragging.current = false;
+      touchDragOriginIndex.current = null;
+      touchDragOverIndex.current = null;
+      setDragIndex(null);
+      setOverIndex(null);
+
+      if (commit && from !== null && to !== null && from !== to) {
+        handleReorder(from, to);
+      }
+    },
+    [handleReorder]
+  );
+
+  useEffect(() => {
+    if (dragIndex === null || !touchDragging.current) return;
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (!event.touches.length) return;
+      const touch = event.touches[0];
+      const nextIndex = findSidebarEventIndexAtPoint(touch.clientX, touch.clientY);
+      if (nextIndex !== null) {
+        touchDragOverIndex.current = nextIndex;
+        setOverIndex(nextIndex);
+      }
+      event.preventDefault();
+    };
+
+    const onTouchEnd = () => {
+      suppressSidebarClick.current = true;
+      finishTouchDrag(true);
+      window.setTimeout(() => {
+        suppressSidebarClick.current = false;
+      }, 0);
+    };
+
+    const onTouchCancel = () => {
+      finishTouchDrag(false);
+    };
+
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+    window.addEventListener('touchcancel', onTouchCancel);
+
+    return () => {
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('touchcancel', onTouchCancel);
+    };
+  }, [dragIndex, findSidebarEventIndexAtPoint, finishTouchDrag]);
+
+  const handleTouchDragStart = (e: React.TouchEvent, index: number) => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    clearEventLongPress();
+    eventTouchStartPoint.current = null;
+    setContextMenu(null);
+    touchDragging.current = true;
+    touchDragOriginIndex.current = index;
+    touchDragOverIndex.current = index;
+    setDragIndex(index);
+    setOverIndex(index);
+  };
+
+  const handleSidebarEventClick = (index: number, active: boolean, clickable: boolean) => {
+    if (suppressSidebarClick.current) {
+      suppressSidebarClick.current = false;
+      return;
+    }
+
+    if (eventLongPressFired.current) {
+      eventLongPressFired.current = false;
+      return;
+    }
+
+    if (clickable) {
+      selectEvent(active ? null : index);
+    }
+  };
 
   const mapNumbers: Record<number, number> = {};
   let counter = 1;
@@ -1218,12 +1478,17 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
               return (
                 <li
                   key={`${event.title}-${index}`}
+                  data-event-index={index}
                   className={
                     `sidebar-event${active ? ' active' : ''}${clickable ? ' clickable' : ''}` +
                     `${dragIndex === index ? ' dragging' : ''}${overIndex === index && dragIndex !== index ? ' drag-over' : ''}`
                   }
-                  onClick={() => clickable && selectEvent(active ? null : index)}
+                  onClick={() => handleSidebarEventClick(index, active, clickable)}
                   onContextMenu={(e) => handleEventContextMenu(e, index)}
+                  onTouchStart={(e) => handleSidebarEventTouchStart(e, index)}
+                  onTouchMove={handleSidebarEventTouchMove}
+                  onTouchEnd={handleSidebarEventTouchEnd}
+                  onTouchCancel={handleSidebarEventTouchEnd}
                   draggable
                   onDragStart={() => setDragIndex(index)}
                   onDragEnter={() => setOverIndex(index)}
@@ -1368,6 +1633,21 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
 
         <div className={`resize-handle${resizing ? ' resizing' : ''}`} onMouseDown={startResize} />
       </div>
+
+      {contextMenu && (
+        <div
+          className="event-context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button className="event-context-item" onClick={handleContextMenuAction} type="button">
+            <span className="event-context-icon" aria-hidden="true">
+              🧭
+            </span>
+            {contextMenu.label}
+          </button>
+        </div>
+      )}
 
       {routePicker && (
         <RoutePickerModal

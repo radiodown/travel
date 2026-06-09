@@ -850,6 +850,12 @@
   gap: 8px;
   max-height: 360px;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.route-option-list::-webkit-scrollbar {
+  display: none;
 }
 
 .route-option {
