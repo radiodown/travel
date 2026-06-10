@@ -15,6 +15,7 @@ import { parseItineraryJson, serializeItinerary } from '../utils/itineraryJson';
 import { getDayReservationItems } from '../utils/reservations';
 import { useDaysWeather } from '../hooks/useDaysWeather';
 import { geocodeCity } from '../utils/weather';
+import { getAirportCodeLabel } from '../utils/airports';
 
 type Props = {
   days: ItineraryDay[];
@@ -35,10 +36,7 @@ type TransferMessage = {
 
 type ToastMotion = 'default' | 'next' | 'prev';
 
-type EventContextMenu = {
-  eventIndex: number;
-  x: number;
-  y: number;
+type EventContextRouteAction = {
   label: '경로 추가' | '경로 다시 찾기';
   kind: 'create' | 'edit';
   draft?: {
@@ -46,6 +44,14 @@ type EventContextMenu = {
     destinationIndex: number;
     departureTime: string;
   };
+};
+
+type EventContextMenu = {
+  eventIndex: number;
+  x: number;
+  y: number;
+  mode: 'actions' | 'move';
+  routeAction: EventContextRouteAction | null;
 };
 
 type RoutePickerState = {
@@ -184,6 +190,13 @@ function getFlightSummaryText(flight: SavedFlight) {
   return [flight.durationText, carrier || null, arrival, booking].filter(Boolean).join(' · ');
 }
 
+function getFlightEndpointLabels(flight: SavedFlight) {
+  return {
+    origin: getAirportCodeLabel(flight.originTitle, undefined, flight.originCoordinates),
+    destination: getAirportCodeLabel(flight.destinationTitle, undefined, flight.destinationCoordinates),
+  };
+}
+
 function getFlightMetaLabels(flight: SavedFlight) {
   const labels = ['✈ 항공 이동', flight.durationText];
   const carrier = [flight.airline, flight.flightNumber].filter(Boolean).join(' ');
@@ -266,6 +279,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const touchDragOverIndex = useRef<number | null>(null);
   const touchDragging = useRef(false);
   const suppressSidebarClick = useRef(false);
+  const pendingMovedEventSelection = useRef<{ dayIndex: number; eventIndex: number } | null>(null);
   const day = days[selectedDayIndex];
   const editingEvent = editingEventIndex !== null ? day.events[editingEventIndex] : null;
   const daysWeather = useDaysWeather(days);
@@ -276,7 +290,13 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   }, []);
 
   useEffect(() => {
-    selectEvent(null);
+    const pendingSelection = pendingMovedEventSelection.current;
+    if (pendingSelection && pendingSelection.dayIndex === selectedDayIndex) {
+      selectEvent(pendingSelection.eventIndex);
+      pendingMovedEventSelection.current = null;
+    } else {
+      selectEvent(null);
+    }
     setEditingEventIndex(null);
     setDraftEvent(null);
     setShowEventModal(false);
@@ -826,8 +846,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const clampContextMenuPosition = useCallback((x: number, y: number) => {
     if (typeof window === 'undefined') return { x, y };
 
-    const menuWidth = 188;
-    const menuHeight = 64;
+    const menuWidth = 248;
+    const menuHeight = 360;
     const margin = 12;
 
     return {
@@ -907,53 +927,97 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
       if (!event) return;
 
       const position = clampContextMenuPosition(x, y);
+      let routeAction: EventContextRouteAction | null = null;
 
       if (isRouteEvent(event)) {
-        setContextMenu({
-          eventIndex,
-          x: position.x,
-          y: position.y,
+        routeAction = {
           label: '경로 다시 찾기',
           kind: 'edit',
-        });
-        return;
-      }
-
-      const draft = getRouteDraftFromListIndex(eventIndex);
-      if (!draft) {
-        showTransferStatus('error', '경로 앞뒤에 위치가 있는 일반 일정이 필요합니다.');
-        return;
+        };
+      } else {
+        const draft = getRouteDraftFromListIndex(eventIndex);
+        if (draft) {
+          routeAction = {
+            label: '경로 추가',
+            kind: 'create',
+            draft,
+          };
+        }
       }
 
       setContextMenu({
         eventIndex,
         x: position.x,
         y: position.y,
-        label: '경로 추가',
-        kind: 'create',
-        draft,
+        mode: 'actions',
+        routeAction,
       });
     },
-    [clampContextMenuPosition, day.events, getRouteDraftFromListIndex, showTransferStatus]
+    [clampContextMenuPosition, day.events, getRouteDraftFromListIndex]
   );
 
-  const handleContextMenuAction = useCallback(() => {
-    if (!contextMenu) return;
+  const handleContextRouteAction = () => {
+    if (!contextMenu || !contextMenu.routeAction) return;
 
-    const menu = contextMenu;
+    const { eventIndex, routeAction } = contextMenu;
     setContextMenu(null);
 
-    if (menu.kind === 'edit') {
-      openEditModal(menu.eventIndex);
+    if (routeAction.kind === 'edit') {
+      openEditModal(eventIndex);
       return;
     }
 
-    if (!menu.draft) return;
+    if (!routeAction.draft) return;
     setShowEventModal(false);
     setEditingEventIndex(null);
     setDraftEvent(null);
-    buildRoutePickerState(menu.draft);
-  }, [buildRoutePickerState, contextMenu]);
+    buildRoutePickerState(routeAction.draft);
+  };
+
+  const handleContextMoveStart = () => {
+    setContextMenu((prev) => (prev ? { ...prev, mode: 'move' } : prev));
+  };
+
+  const handleContextMoveBack = () => {
+    setContextMenu((prev) => (prev ? { ...prev, mode: 'actions' } : prev));
+  };
+
+  const handleMoveEventToDay = (targetDayIndex: number) => {
+    if (!contextMenu || targetDayIndex === selectedDayIndex) return;
+
+    const eventToMove = day.events[contextMenu.eventIndex];
+    const targetDay = days[targetDayIndex];
+    if (!eventToMove || !targetDay) return;
+
+    pendingMovedEventSelection.current = {
+      dayIndex: targetDayIndex,
+      eventIndex: targetDay.events.length,
+    };
+
+    setDays((prev) =>
+      prev.map((currentDay, index) => {
+        if (index === selectedDayIndex) {
+          return {
+            ...currentDay,
+            events: currentDay.events.filter((_, eventIndex) => eventIndex !== contextMenu.eventIndex),
+          };
+        }
+
+        if (index === targetDayIndex) {
+          return {
+            ...currentDay,
+            events: [...currentDay.events, eventToMove],
+          };
+        }
+
+        return currentDay;
+      })
+    );
+
+    setContextMenu(null);
+    onSelectDay(targetDayIndex);
+    showTransferStatus('success', `'${eventToMove.title}' 일정을 ${targetDay.day}로 옮겼습니다.`);
+  };
 
   const handleEventContextMenu = (e: React.MouseEvent, eventIndex: number) => {
     e.preventDefault();
@@ -1177,6 +1241,9 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
       counter += 1;
     }
   });
+  const contextMoveTargets = days.flatMap((candidateDay, index) =>
+    index === selectedDayIndex ? [] : [{ index, day: candidateDay }]
+  );
   const reservationItems = getDayReservationItems(day);
 
   return (
@@ -1201,6 +1268,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           const routeSummary = isRoute ? getRouteWidgetSummary(event.route) : null;
           const routeTransfers = isRoute ? getRouteTransfersPreview(event.route) : [];
           const flightSummary = isFlightMovement ? getFlightSummaryText(event.flight) : null;
+          const flightEndpoints = isFlightMovement ? getFlightEndpointLabels(event.flight) : null;
 
           return (
             <div
@@ -1231,7 +1299,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                 {isFlightMovement && (
                   <>
                     <p className="map-toast-route-leg">
-                      {event.flight.originTitle} <span aria-hidden="true">→</span> {event.flight.destinationTitle}
+                      {flightEndpoints?.origin} <span aria-hidden="true">→</span> {flightEndpoints?.destination}
                     </p>
                   </>
                 )}
@@ -1487,6 +1555,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
               const routeSummary = isRoute ? getRouteWidgetSummary(event.route) : null;
               const eventDescription = getEventDescription(event.description, event.note);
               const routeTransfers = isRoute ? getRouteTransfersPreview(event.route) : [];
+              const flightEndpoints = isFlightMovement ? getFlightEndpointLabels(event.flight) : null;
 
               return (
                 <li
@@ -1567,11 +1636,11 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                     ) : isFlightMovement ? (
                       <>
                         <p className="ev-route-leg">
-                          <span>{event.flight.originTitle}</span>
+                          <span>{flightEndpoints?.origin}</span>
                           <span className="ev-route-arrow" aria-hidden="true">
                             →
                           </span>
-                          <span>{event.flight.destinationTitle}</span>
+                          <span>{flightEndpoints?.destination}</span>
                         </p>
                         <div className="ev-route-meta">
                           {getFlightMetaLabels(event.flight).map((label) => (
@@ -1655,12 +1724,53 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button className="event-context-item" onClick={handleContextMenuAction} type="button">
-            <span className="event-context-icon" aria-hidden="true">
-              🧭
-            </span>
-            {contextMenu.label}
-          </button>
+          {contextMenu.mode === 'actions' ? (
+            <>
+              {contextMenu.routeAction && (
+                <button className="event-context-item" onClick={handleContextRouteAction} type="button">
+                  <span className="event-context-icon" aria-hidden="true">
+                    🧭
+                  </span>
+                  {contextMenu.routeAction.label}
+                </button>
+              )}
+              <button
+                className="event-context-item"
+                disabled={!contextMoveTargets.length}
+                onClick={handleContextMoveStart}
+                type="button"
+              >
+                <span className="event-context-icon" aria-hidden="true">
+                  ↗
+                </span>
+                다른 일정으로 보내기
+              </button>
+              {!contextMoveTargets.length && (
+                <p className="event-context-hint">이동할 다른 일정이 없습니다.</p>
+              )}
+            </>
+          ) : (
+            <>
+              <button className="event-context-back" onClick={handleContextMoveBack} type="button">
+                ← 돌아가기
+              </button>
+              <p className="event-context-title">보낼 일정 선택</p>
+              <div className="event-context-day-list">
+                {contextMoveTargets.map(({ index, day: moveTarget }) => (
+                  <button
+                    key={`${moveTarget.day}-${index}`}
+                    className="event-context-day-item"
+                    onClick={() => handleMoveEventToDay(index)}
+                    type="button"
+                  >
+                    <span className="event-context-day-label">{moveTarget.day}</span>
+                    <span className="event-context-day-title">{moveTarget.title}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="event-context-hint">선택한 일차의 마지막 일정으로 이동합니다.</p>
+            </>
+          )}
         </div>
       )}
 

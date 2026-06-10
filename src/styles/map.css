@@ -396,18 +396,46 @@
     inset 0 -1px 1px rgba(255, 255, 255, 0.32);
 }
 
-.map-locate-btn:disabled {
-  cursor: wait;
+.map-locate-btn.is-active,
+.map-locate-btn.is-loading {
+  background:
+    linear-gradient(
+      150deg,
+      color-mix(in srgb, var(--accent) 90%, white) 0%,
+      var(--accent) 100%
+    );
+  border-color: rgba(255, 255, 255, 0.72);
+  color: #2563eb;
 }
 
-.map-locate-btn.is-loading {
-  color: #2563eb;
+.map-locate-btn.is-active {
+  color: white;
+  box-shadow:
+    0 18px 38px color-mix(in srgb, var(--accent) 28%, transparent),
+    inset 0 1px 1px rgba(255, 255, 255, 0.55);
+}
+
+.map-locate-btn.is-loading .map-locate-btn-icon {
+  animation: locatePulse 1s ease-in-out infinite;
 }
 
 .map-locate-btn-icon {
   font-size: 1.34rem;
   line-height: 1;
   font-weight: 800;
+}
+
+@keyframes locatePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.72;
+  }
+
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
 }
 
 .map-toast {

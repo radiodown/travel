@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EventAttachment, ItineraryEvent } from '../data/itinerary';
 import { CATEGORIES, CATEGORY_ORDER, type EventCategory } from '../data/categories';
+import { getAirportCodeLabel } from '../utils/airports';
 import GlassSelect from './GlassSelect';
 
 type Props = {
@@ -357,8 +358,8 @@ export default function AddEventModal({
         category: 'flight',
         time: time.trim() || getCurrentTimeValue(),
         flight: {
-          originTitle: origin.title,
-          destinationTitle: destination.title,
+          originTitle: getAirportCodeLabel(origin.title, origin.location, origin.coordinates),
+          destinationTitle: getAirportCodeLabel(destination.title, destination.location, destination.coordinates),
           originCoordinates: origin.coordinates,
           destinationCoordinates: destination.coordinates,
           path: [origin.coordinates, destination.coordinates],
