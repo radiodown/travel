@@ -6615,11 +6615,145 @@
           "category": "sightseeing"
         },
         {
-          "title": "현지 카페",
-          "description": "프라하 인기 카페에서 여유 시간",
+          "title": "⭐ 나세마소 (Naše maso)",
+          "description": "수제햄버거. 체코인들도 줄 서서 먹는 곳. 햄버거 좋아하면 추천.",
+          "location": "팔라디움 백화점 근처",
+          "note": "지도: https://goo.gl/maps/EoRQphZRHgy",
           "coordinates": [
-            50.085,
-            14.418
+            50.090866,
+            14.426879
+          ],
+          "category": "food"
+        },
+        {
+          "title": "⭐ Lokál Dlouhááá",
+          "description": "필스너우르켈과 코젤다크 생맥주 추천. 일반 생맥 후 물리코 거품 맥주도 추천.",
+          "location": "팔라디움 백화점 근처",
+          "note": "지도: https://goo.gl/maps/YvcgfQXM21K2",
+          "coordinates": [
+            50.090693,
+            14.425757
+          ],
+          "category": "food"
+        },
+        {
+          "title": "⭐ 코즐로브나 (까를교 근처)",
+          "description": "꼴레뇨, 제브라, 코젤다크 추천. 꼴레뇨 하나면 2명이 충분히 먹을 수 있음.",
+          "location": "까를교 근처",
+          "note": "지도: https://goo.gl/maps/yL7QrfJSkXM2",
+          "coordinates": [
+            50.08735,
+            14.415248
+          ],
+          "category": "food"
+        },
+        {
+          "title": "⭐ Kozlovna U Paukerta",
+          "description": "꼴레뇨, 제브라, 코젤다크 추천. 나로드니 뜨리다 근처 코즐로브나 지점.",
+          "location": "나로드니 뜨리다 근처",
+          "note": "지도: https://maps.app.goo.gl/Kr17wgr1vX4FJMTL6?g_st=ic",
+          "coordinates": [
+            50.081992,
+            14.417003
+          ],
+          "category": "food"
+        },
+        {
+          "title": "U Glaubiců",
+          "description": "체코 레스토랑. 코로나 시기에도 체코인들로 붐비던 현지 인기 맛집.",
+          "location": "까를교 북단 성 니콜라스 성당 근처",
+          "note": "지도: https://goo.gl/maps/VmmotVs7XgGiCMJ97",
+          "coordinates": [
+            50.087657,
+            14.403527
+          ],
+          "category": "food"
+        },
+        {
+          "title": "Pork's",
+          "description": "체코 레스토랑. 테이블 수가 많고 꼴레뇨가 빠르게 나오는 편. 직원 한국어 대응 가능.",
+          "location": "까를교 북단 첨탑 근처",
+          "note": "지도: https://maps.app.goo.gl/k35UnyFTQJKvHRJP9?g_st=ic",
+          "coordinates": [
+            50.087507,
+            14.406057
+          ],
+          "category": "food"
+        },
+        {
+          "title": "Marina Ristorante",
+          "description": "까를교와 프라하성 전망이 좋은 선상 레스토랑. 성수기 저녁 시간 예약 권장.",
+          "location": "블타바 강변",
+          "note": "지도: https://maps.app.goo.gl/kCyJd78CuCYVuyNT7?g_st=ic",
+          "coordinates": [
+            50.089142,
+            14.413791
+          ],
+          "category": "food"
+        },
+        {
+          "title": "Crème de la Crème (나로드니 뜨리다)",
+          "description": "젤라또 맛집.",
+          "location": "나로드니 뜨리다",
+          "note": "지도: https://goo.gl/maps/xDAho4AXEMN2",
+          "coordinates": [
+            50.082149,
+            14.417773
+          ],
+          "category": "food"
+        },
+        {
+          "title": "⭐ Crème de la Crème (구시가지)",
+          "description": "구시가지 쪽 젤라또 맛집.",
+          "location": "구시가지",
+          "note": "지도: https://goo.gl/maps/kbSXHtzt95wA2t47A",
+          "coordinates": [
+            50.085808,
+            14.418265
+          ],
+          "category": "food"
+        },
+        {
+          "title": "Ali Baba Kebap",
+          "description": "케밥.",
+          "location": "팔라디움 백화점 근처",
+          "note": "지도: https://maps.app.goo.gl/paqDRcMfiK6k6ojx8?g_st=ic",
+          "coordinates": [
+            50.089671,
+            14.432198
+          ],
+          "category": "food"
+        },
+        {
+          "title": "Lžička café",
+          "description": "저렴하고 맛있는 디저트와 커피를 마실 수 있는 현지인 카페.",
+          "location": "말라 스트라나",
+          "note": "지도: https://maps.app.goo.gl/beKch4SqYLfc9err5?g_st=ic",
+          "coordinates": [
+            50.087292,
+            14.402787
+          ],
+          "category": "food"
+        },
+        {
+          "title": "Zubang (프라하 주방)",
+          "description": "구시가지 근처 중식당.",
+          "location": "구시가지 근처",
+          "note": "지도: https://maps.app.goo.gl/3v3mLMckTPn9d7Qa7?g_st=ic",
+          "coordinates": [
+            50.088448,
+            14.417893
+          ],
+          "category": "food"
+        },
+        {
+          "title": "Praha MATZIP",
+          "description": "구시가지 근처 한식당.",
+          "location": "구시가지 근처",
+          "note": "지도: https://maps.app.goo.gl/cNBSAZxCTqTE9B9H6?g_st=ic",
+          "coordinates": [
+            50.089405,
+            14.421417
           ],
           "category": "food"
         }
