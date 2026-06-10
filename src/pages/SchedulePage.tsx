@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, SetStateAction } from 'react';
 import type { ItineraryDay, ItineraryEvent, SavedFlight, SavedRoute } from '../data/itinerary';
-import { CATEGORIES } from '../data/categories';
+import { CATEGORIES, CATEGORY_ORDER, type EventCategory } from '../data/categories';
 import MapView from '../components/MapView';
 import AddEventModal, { type RouteDraftRequest } from '../components/AddEventModal';
 import RoutePickerModal from '../components/RoutePickerModal';
@@ -36,6 +36,7 @@ type TransferMessage = {
 };
 
 type ToastMotion = 'default' | 'next' | 'prev';
+type CategoryFilter = EventCategory | 'all';
 
 type EventContextRouteAction = {
   label: '경로 추가' | '경로 다시 찾기';
@@ -307,6 +308,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches
   );
   const [showMobileEventList, setShowMobileEventList] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+  const [showCategoryFilter, setShowCategoryFilter] = useState(true);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<EventContextMenu | null>(null);
@@ -328,6 +331,31 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const day = days[selectedDayIndex];
   const editingEvent = editingEventIndex !== null ? day.events[editingEventIndex] : null;
   const daysWeather = useDaysWeather(days);
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<EventCategory, number>();
+    day.events.forEach((event) => {
+      if (!event.category) return;
+      counts.set(event.category, (counts.get(event.category) ?? 0) + 1);
+    });
+    return counts;
+  }, [day.events]);
+  const availableCategories = useMemo(
+    () => CATEGORY_ORDER.filter((category) => categoryCounts.has(category)),
+    [categoryCounts]
+  );
+  const visibleEventEntries = useMemo(
+    () =>
+      day.events
+        .map((event, index) => ({ event, index }))
+        .filter(({ event }) => categoryFilter === 'all' || event.category === categoryFilter),
+    [categoryFilter, day.events]
+  );
+  const visibleEventIndexSet = useMemo(
+    () => new Set(visibleEventEntries.map(({ index }) => index)),
+    [visibleEventEntries]
+  );
+  const activeCategory = categoryFilter === 'all' ? null : CATEGORIES[categoryFilter];
+  const activeCategoryLabel = activeCategory?.label ?? '전체';
 
   const selectEvent = useCallback((index: number | null, motion: ToastMotion = 'default') => {
     setToastMotion(motion);
@@ -347,7 +375,20 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     setShowEventModal(false);
     setContextMenu(null);
     setRoutePicker(null);
+    setCategoryFilter('all');
   }, [selectEvent, selectedDayIndex]);
+
+  useEffect(() => {
+    if (categoryFilter !== 'all' && !categoryCounts.has(categoryFilter)) {
+      setCategoryFilter('all');
+    }
+  }, [categoryCounts, categoryFilter]);
+
+  useEffect(() => {
+    if (selectedEventIndex !== null && !visibleEventIndexSet.has(selectedEventIndex)) {
+      selectEvent(null);
+    }
+  }, [selectEvent, selectedEventIndex, visibleEventIndexSet]);
 
   useEffect(() => {
     if (!routePicker) return;
@@ -1282,7 +1323,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const mapNumbers: Record<number, number> = {};
   let counter = 1;
   day.events.forEach((event, index) => {
-    if (event.coordinates && !isRouteEvent(event)) {
+    if (visibleEventIndexSet.has(index) && event.coordinates && !isRouteEvent(event)) {
       mapNumbers[index] = counter;
       counter += 1;
     }
@@ -1302,6 +1343,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           cleanMode={cleanMapMode}
           onAddLocation={handleAddLocationFromMap}
           visibleOffsetX={visibleOffsetX}
+          visibleEventIndexes={visibleEventIndexSet}
         />
 
         {selectedEventIndex !== null && day.events[selectedEventIndex] && (() => {
@@ -1584,8 +1626,67 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
             <p className="sidebar-day-date">{day.date}</p>
           </div>
 
+          {availableCategories.length > 0 && (
+            <div
+              className={`sidebar-category-filter${showCategoryFilter ? ' is-open' : ' is-collapsed'}`}
+              aria-label="카테고리 필터"
+            >
+              <button
+                className="category-filter-toggle"
+                onClick={() => setShowCategoryFilter((prev) => !prev)}
+                type="button"
+                aria-expanded={showCategoryFilter}
+                aria-label={showCategoryFilter ? '카테고리 필터 숨기기' : '카테고리 필터 보기'}
+              >
+                <span className="category-filter-toggle-title">필터</span>
+                <span className="category-filter-toggle-current">
+                  {activeCategory ? `${activeCategory.icon} ${activeCategoryLabel}` : activeCategoryLabel} · {visibleEventEntries.length}
+                </span>
+                <span className="category-filter-toggle-arrow" aria-hidden="true">
+                  ▾
+                </span>
+              </button>
+
+              {showCategoryFilter && (
+                <div className="category-filter-options">
+                  <button
+                    className={`category-filter-chip${categoryFilter === 'all' ? ' is-active' : ''}`}
+                    onClick={() => setCategoryFilter('all')}
+                    type="button"
+                  >
+                    <span>전체</span>
+                    <small>{day.events.length}</small>
+                  </button>
+                  {availableCategories.map((categoryKey) => {
+                    const category = CATEGORIES[categoryKey];
+                    const count = categoryCounts.get(categoryKey) ?? 0;
+                    return (
+                      <button
+                        key={categoryKey}
+                        className={`category-filter-chip${categoryFilter === categoryKey ? ' is-active' : ''}`}
+                        onClick={() => setCategoryFilter(categoryKey)}
+                        style={
+                          {
+                            '--filter-color': category.color,
+                            '--filter-light': category.light,
+                          } as CSSProperties
+                        }
+                        type="button"
+                      >
+                        <span>
+                          {category.icon} {category.label}
+                        </span>
+                        <small>{count}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           <ul className="sidebar-event-list">
-            {day.events.map((event, index) => {
+            {visibleEventEntries.map(({ event, index }) => {
               const num = mapNumbers[index];
               const active = selectedEventIndex === index;
               const clickable = isSelectableEvent(event);

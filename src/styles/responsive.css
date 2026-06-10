@@ -59,6 +59,7 @@
 
   /* Hide everything except the day tabs */
   .sidebar-day-header,
+  .sidebar-category-filter,
   .sidebar-event-list,
   .add-event-btn,
   .sidebar-res {
@@ -76,8 +77,8 @@
 
   .schedule-sidebar.is-mobile-list-open .sidebar-event-list {
     display: block;
-    max-height: calc(var(--app-height) - 154px - var(--safe-area-top) - var(--safe-area-bottom));
-    margin: 10px 12px 0;
+    max-height: calc(var(--app-height) - 212px - var(--safe-area-top) - var(--safe-area-bottom));
+    margin: 8px 12px 0;
     overflow-y: auto;
     overscroll-behavior: contain;
     border: 1px solid rgba(255, 255, 255, 0.62);
@@ -94,6 +95,29 @@
       0 18px 48px rgba(15, 23, 42, 0.2),
       inset 0 1px 1px rgba(255, 255, 255, 0.8);
     scrollbar-width: none;
+  }
+
+  .schedule-sidebar.is-mobile-list-open .sidebar-category-filter {
+    display: block;
+    margin: 10px 12px 0;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.62);
+    border-radius: 18px;
+    background:
+      linear-gradient(
+        160deg,
+        rgba(255, 255, 255, 0.82) 0%,
+        rgba(255, 255, 255, 0.62) 100%
+      );
+    backdrop-filter: blur(26px) saturate(180%);
+    -webkit-backdrop-filter: blur(26px) saturate(180%);
+    box-shadow:
+      0 12px 32px rgba(15, 23, 42, 0.16),
+      inset 0 1px 1px rgba(255, 255, 255, 0.8);
+  }
+
+  .schedule-sidebar.is-mobile-list-open .sidebar-category-filter.is-collapsed + .sidebar-event-list {
+    max-height: calc(var(--app-height) - 168px - var(--safe-area-top) - var(--safe-area-bottom));
   }
 
   .schedule-sidebar.is-mobile-list-open .sidebar-event-list::-webkit-scrollbar {

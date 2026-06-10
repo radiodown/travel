@@ -1016,6 +1016,7 @@ type Props = {
   /** Horizontal pixels covered by the floating sidebar, so the map can center
    *  the selected place within the remaining visible area. */
   visibleOffsetX?: number;
+  visibleEventIndexes?: Set<number>;
 };
 
 export default function MapView({
@@ -1025,39 +1026,42 @@ export default function MapView({
   cleanMode = true,
   onAddLocation,
   visibleOffsetX = 0,
+  visibleEventIndexes,
 }: Props) {
   const [poiCandidate, setPoiCandidate] = useState<PoiCandidate | null>(null);
   const hasFocusedSelectionRef = useRef(false);
+  const isEventVisible = (index: number) => !visibleEventIndexes || visibleEventIndexes.has(index);
   const mapped = events
     .map((e, i) => ({ event: e, origIndex: i }))
-    .filter(({ event }) => !!event.coordinates && !event.route && !event.flight);
+    .filter(({ event, origIndex }) => isEventVisible(origIndex) && !!event.coordinates && !event.route && !event.flight);
   const routeEvents = events
     .map((event, index) => ({ event, index }))
     .filter((item): item is { event: ItineraryEvent & { route: NonNullable<ItineraryEvent['route']> }; index: number } =>
-      !!item.event.route && item.event.route.path.length > 0
+      isEventVisible(item.index) && !!item.event.route && item.event.route.path.length > 0
     );
   const flightEvents = events
     .map((event, index) => ({ event, index }))
     .filter((item): item is { event: ItineraryEvent & { flight: SavedFlight }; index: number } =>
-      isFlightMovementEvent(item.event)
+      isEventVisible(item.index) && isFlightMovementEvent(item.event)
     );
 
   const defaultCenter = mapped.length > 0
     ? { lat: mapped[0].event.coordinates![0], lng: mapped[0].event.coordinates![1] }
     : { lat: 50.0755, lng: 14.4378 };
 
+  const selectedEventIsVisible = selectedIndex !== null && isEventVisible(selectedIndex);
   const selectedCoord =
-    selectedIndex !== null && events[selectedIndex]?.coordinates
+    selectedEventIsVisible && selectedIndex !== null && events[selectedIndex]?.coordinates
       ? events[selectedIndex].coordinates!
       : null;
   const selectedRoutePath =
-    selectedIndex !== null && events[selectedIndex]?.route?.path.length
+    selectedEventIsVisible && selectedIndex !== null && events[selectedIndex]?.route?.path.length
       ? events[selectedIndex].route!.path
-      : selectedIndex !== null && events[selectedIndex]?.flight?.path.length
+      : selectedEventIsVisible && selectedIndex !== null && events[selectedIndex]?.flight?.path.length
         ? events[selectedIndex].flight!.path
       : null;
   const selectedRouteSegments =
-    selectedIndex !== null && events[selectedIndex]?.route?.segments?.length
+    selectedEventIsVisible && selectedIndex !== null && events[selectedIndex]?.route?.segments?.length
       ? events[selectedIndex].route!.segments
       : [];
   const selectedRouteTransferMarkers = buildTransferMarkers(selectedRouteSegments);

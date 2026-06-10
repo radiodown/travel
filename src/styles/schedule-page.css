@@ -485,6 +485,126 @@
   color: #94a3b8;
 }
 
+.sidebar-category-filter {
+  display: block;
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  background: rgba(248, 250, 252, 0.5);
+}
+
+.category-filter-toggle {
+  width: 100%;
+  height: 32px;
+  padding: 0 4px 0 2px;
+  border: none;
+  background: transparent;
+  color: #475569;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+.category-filter-toggle-title {
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.category-filter-toggle-current {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  justify-self: end;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.category-filter-toggle-arrow {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1;
+  transition: transform 0.16s, background 0.16s, color 0.16s;
+}
+
+.category-filter-toggle:hover .category-filter-toggle-arrow {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.sidebar-category-filter.is-collapsed .category-filter-toggle-arrow {
+  transform: rotate(-90deg);
+}
+
+.category-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-top: 8px;
+}
+
+.category-filter-chip {
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid rgba(203, 213, 225, 0.75);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.86);
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+}
+
+.category-filter-chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--filter-color, var(--accent));
+  color: var(--filter-color, var(--accent));
+}
+
+.category-filter-chip.is-active {
+  background: var(--filter-light, var(--accent-tint));
+  border-color: color-mix(in srgb, var(--filter-color, var(--accent)) 32%, transparent);
+  color: var(--filter-color, var(--accent));
+}
+
+.category-filter-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-filter-chip small {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.66rem;
+  font-weight: 900;
+  color: currentColor;
+}
+
 .sidebar-event-list {
   list-style: none;
   flex: 1;
