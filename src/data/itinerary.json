@@ -5785,7 +5785,6 @@
           "category": "sightseeing"
         }
       ],
-      "mapHint": "프라하 공항 → 호텔 → 시내 이동 경로",
       "reservations": [
       ]
     },
@@ -5823,7 +5822,6 @@
           "category": "etc"
         }
       ],
-      "mapHint": "프라하 성 → 페트린 힐 → 재즈바",
       "reservations": [
         {
           "label": "재즈바 예약",
@@ -5919,7 +5917,6 @@
           "category": "sightseeing"
         }
       ],
-      "mapHint": "프라하 → 중앙버스스테이션 플로렌츠 → 크롬로프",
       "reservations": [
         {
           "label": "버스 Route 853",
@@ -5962,7 +5959,6 @@
           "category": "sightseeing"
         }
       ],
-      "mapHint": "크롬로프 → 할슈타트",
       "reservations": [
         {
           "label": "CK Shuttle",
@@ -6007,7 +6003,6 @@
           "category": "move"
         }
       ],
-      "mapHint": "할슈타트 → Attnang-Puchheim → Wien Hbf",
       "reservations": [
         {
           "label": "기차 티켓",
@@ -6087,7 +6082,6 @@
           "category": "stay"
         }
       ],
-      "mapHint": "Wien Hbf → Budapest",
       "reservations": [
         {
           "label": "RJX 61 기차",
@@ -6176,7 +6170,6 @@
           "category": "move"
         }
       ],
-      "mapHint": "부다페스트 시내 → 페렌츠 리스트 공항",
       "reservations": [
         {
           "label": "세체니 온천",

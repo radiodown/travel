@@ -7,6 +7,7 @@ import AddEventModal, { type RouteDraftRequest } from '../components/AddEventMod
 import RoutePickerModal from '../components/RoutePickerModal';
 import {
   fetchRouteOptions,
+  formatDistanceFromMeters,
   type RouteOption,
   type RouteSearchOptions,
   type TravelModeKey,
@@ -108,6 +109,21 @@ function isSelectableEvent(event: ItineraryEvent) {
   return !!event.coordinates || isRouteEvent(event) || isFlightMovementEvent(event);
 }
 
+function getRouteWalkingDistanceText(route: SavedRoute) {
+  if (route.walkingDistanceText) return route.walkingDistanceText;
+
+  const walkingMeters = route.segments
+    .filter((segment) => segment.mode === 'WALKING')
+    .reduce((sum, segment) => sum + segment.distanceValue, 0);
+
+  return walkingMeters > 0 ? formatDistanceFromMeters(walkingMeters) : undefined;
+}
+
+function getRouteWalkingLabel(route: SavedRoute) {
+  const walking = [route.walkingDurationText, getRouteWalkingDistanceText(route)].filter(Boolean).join(' · ');
+  return walking ? `도보 ${walking}` : null;
+}
+
 function getRouteSummaryText(route: SavedRoute) {
   const transferLabel =
     route.mode === 'TRANSIT'
@@ -115,7 +131,7 @@ function getRouteSummaryText(route: SavedRoute) {
         ? `환승 ${route.transferCount}회`
         : '직행'
       : null;
-  const walking = route.walkingDurationText ? `도보 ${route.walkingDurationText}` : null;
+  const walking = getRouteWalkingLabel(route);
   const timing =
     route.departureText && route.arrivalText ? `${route.departureText} - ${route.arrivalText}` : null;
   return [route.durationText, transferLabel, walking, timing].filter(Boolean).join(' · ');
@@ -141,9 +157,8 @@ function getRouteWidgetSummary(route: SavedRoute) {
 
   if (route.mode === 'TRANSIT') {
     parts.push(route.transferCount > 0 ? `환승 ${route.transferCount}회` : '직행');
-    if (route.walkingDurationText) {
-      parts.push(`도보 ${route.walkingDurationText}`);
-    }
+    const walking = getRouteWalkingLabel(route);
+    if (walking) parts.push(walking);
   } else if (route.distanceText) {
     parts.push(route.distanceText);
   }
@@ -177,17 +192,9 @@ function getRouteMetaLabels(route: SavedRoute) {
   if (route.mode === 'TRANSIT') {
     labels.push(route.transferCount > 0 ? `환승 ${route.transferCount}회` : '직행');
   }
-  if (route.walkingDurationText) {
-    labels.push(`도보 ${route.walkingDurationText}`);
-  }
+  const walking = getRouteWalkingLabel(route);
+  if (walking) labels.push(walking);
   return labels;
-}
-
-function getFlightSummaryText(flight: SavedFlight) {
-  const carrier = [flight.airline, flight.flightNumber].filter(Boolean).join(' ');
-  const arrival = flight.arrivalTimeText ? `도착 ${flight.arrivalTimeText}` : null;
-  const booking = flight.bookingReference ? `예약 ${flight.bookingReference}` : null;
-  return [flight.durationText, carrier || null, arrival, booking].filter(Boolean).join(' · ');
 }
 
 function getFlightEndpointLabels(flight: SavedFlight) {
@@ -197,13 +204,51 @@ function getFlightEndpointLabels(flight: SavedFlight) {
   };
 }
 
-function getFlightMetaLabels(flight: SavedFlight) {
-  const labels = ['✈ 항공 이동', flight.durationText];
-  const carrier = [flight.airline, flight.flightNumber].filter(Boolean).join(' ');
-  if (carrier) labels.push(carrier);
-  if (flight.arrivalTimeText) labels.push(`도착 ${flight.arrivalTimeText}`);
-  if (flight.bookingReference) labels.push(`예약 ${flight.bookingReference}`);
-  return labels;
+function getCompactTimeLabel(value?: string) {
+  const text = value?.trim();
+  if (!text) return null;
+
+  const periodMatch = text.match(/^(오전|오후)\s*(\d{1,2})(?::|시\s*)(\d{1,2})?/);
+  if (periodMatch) {
+    const period = periodMatch[1];
+    let hour = Number(periodMatch[2]);
+    const minute = Number(periodMatch[3] ?? 0);
+
+    if (period === '오전' && hour === 12) hour = 0;
+    if (period === '오후' && hour < 12) hour += 12;
+
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  }
+
+  const timeMatch = text.match(/^(\d{1,2})(?::|시\s*)(\d{1,2})?/);
+  if (timeMatch) {
+    return `${String(Number(timeMatch[1])).padStart(2, '0')}:${String(Number(timeMatch[2] ?? 0)).padStart(2, '0')}`;
+  }
+
+  return text;
+}
+
+function getCompactDurationLabel(value: string) {
+  const text = value.trim();
+  const hourMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:시간|h|hr|hour)/i);
+  const minuteMatch = text.match(/(\d+)\s*(?:분|m|min|minute)/i);
+  const parts: string[] = [];
+
+  if (hourMatch) parts.push(`${hourMatch[1]}H`);
+  if (minuteMatch) parts.push(`${minuteMatch[1]}M`);
+
+  return parts.length > 0 ? parts.join(' ') : text;
+}
+
+function getFlightScheduleText(flight: SavedFlight, departureTime?: string) {
+  const endpoints = getFlightEndpointLabels(flight);
+  const departure = getCompactTimeLabel(departureTime);
+  const arrival = getCompactTimeLabel(flight.arrivalTimeText);
+  const duration = getCompactDurationLabel(flight.durationText);
+  const origin = departure ? `${endpoints.origin} (${departure})` : endpoints.origin;
+  const destination = arrival ? `${endpoints.destination} (${arrival})` : endpoints.destination;
+
+  return duration ? `${origin} → ${duration} → ${destination}` : `${origin} → ${destination}`;
 }
 
 function getRouteEditorState(routeEventIndex: number, events: ItineraryEvent[]) {
@@ -778,6 +823,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
       transitPreference: routePicker.mode === 'TRANSIT' ? routePicker.transitPreference : undefined,
       transferCount: option.transferCount,
       walkingDurationText: option.walkingDurationText,
+      walkingDistanceText: option.walkingDistanceText,
       transitLines: option.transitLines,
       path: option.path,
       segments: option.segments,
@@ -1267,8 +1313,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           const routeTitle = isRoute ? getRouteWidgetTitle(event.route) : null;
           const routeSummary = isRoute ? getRouteWidgetSummary(event.route) : null;
           const routeTransfers = isRoute ? getRouteTransfersPreview(event.route) : [];
-          const flightSummary = isFlightMovement ? getFlightSummaryText(event.flight) : null;
-          const flightEndpoints = isFlightMovement ? getFlightEndpointLabels(event.flight) : null;
+          const flightSchedule = isFlightMovement ? getFlightScheduleText(event.flight, event.time) : null;
 
           return (
             <div
@@ -1293,15 +1338,11 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                       {category.icon} {category.label}
                     </span>
                   )}
-                  {event.time && <span className="map-toast-time">{event.time}</span>}
+                  {event.time && !isFlightMovement && <span className="map-toast-time">{event.time}</span>}
                 </div>
                 <h4 className="map-toast-title">{routeTitle ?? event.title}</h4>
                 {isFlightMovement && (
-                  <>
-                    <p className="map-toast-route-leg">
-                      {flightEndpoints?.origin} <span aria-hidden="true">→</span> {flightEndpoints?.destination}
-                    </p>
-                  </>
+                  <p className="map-toast-flight-summary">{flightSchedule}</p>
                 )}
                 {false && isRoute && (
                   <>
@@ -1316,7 +1357,6 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                 {!isRouteEvent(event) && event.location && <p className="map-toast-loc">📍 {event.location}</p>}
                 {!isRouteEvent(event) && eventDescription && <p className="map-toast-desc">{eventDescription}</p>}
                 {routeSummary && <p className="map-toast-route-meta">{routeSummary}</p>}
-                {flightSummary && <p className="map-toast-route-meta">{flightSummary}</p>}
                 {routeTransfers.length > 0 && (
                   <div className="map-toast-route-steps">
                     {routeTransfers.map((transfer, index) => (
@@ -1555,7 +1595,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
               const routeSummary = isRoute ? getRouteWidgetSummary(event.route) : null;
               const eventDescription = getEventDescription(event.description, event.note);
               const routeTransfers = isRoute ? getRouteTransfersPreview(event.route) : [];
-              const flightEndpoints = isFlightMovement ? getFlightEndpointLabels(event.flight) : null;
+              const flightSchedule = isFlightMovement ? getFlightScheduleText(event.flight, event.time) : null;
 
               return (
                 <li
@@ -1592,7 +1632,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                   <div className={`ev-num${num ? '' : ' ev-num--none'}`}>{num ?? '·'}</div>
                   <div className="ev-info">
                     <div className="ev-meta-row">
-                      {event.time && <span className="ev-time">{event.time}</span>}
+                      {event.time && !isFlightMovement && <span className="ev-time">{event.time}</span>}
                       {event.category && (
                         <span
                           className="ev-cat"
@@ -1634,22 +1674,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                         )}
                       </>
                     ) : isFlightMovement ? (
-                      <>
-                        <p className="ev-route-leg">
-                          <span>{flightEndpoints?.origin}</span>
-                          <span className="ev-route-arrow" aria-hidden="true">
-                            →
-                          </span>
-                          <span>{flightEndpoints?.destination}</span>
-                        </p>
-                        <div className="ev-route-meta">
-                          {getFlightMetaLabels(event.flight).map((label) => (
-                            <span key={label} className="ev-route-chip">
-                              {label}
-                            </span>
-                          ))}
-                        </div>
-                      </>
+                      <p className="ev-flight-summary">{flightSchedule}</p>
                     ) : (
                       <>
                         {event.location && <p className="ev-loc">📍 {event.location}</p>}

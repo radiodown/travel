@@ -57,6 +57,7 @@ export type SavedRoute = {
   transitPreference?: RouteTransitPreference;
   transferCount: number;
   walkingDurationText?: string;
+  walkingDistanceText?: string;
   transitLines: string[];
   path: [number, number][];
   segments: SavedRouteSegment[];
@@ -96,7 +97,6 @@ export type ItineraryDay = {
   date: string;
   summary: string;
   events: ItineraryEvent[];
-  mapHint?: string;
   reservations?: ReservationInfo[];
   city?: string;
   cityCoordinates?: [number, number]; // [lat, lng] used as the weather location

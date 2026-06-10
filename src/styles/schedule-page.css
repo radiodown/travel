@@ -836,6 +836,14 @@
   margin-bottom: 5px;
 }
 
+.ev-flight-summary {
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.45;
+  margin: 4px 0 2px;
+}
+
 .ev-route-summary {
   font-size: 0.74rem;
   color: #475569;

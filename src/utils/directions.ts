@@ -24,6 +24,7 @@ export type RouteOption = {
   arrivalText?: string;
   transferCount: number;
   walkingDurationText?: string;
+  walkingDistanceText?: string;
   transitLines: string[];
   path: [number, number][];
   segments: SavedRouteSegment[];
@@ -79,13 +80,17 @@ function stripHtml(value?: string | null) {
   return value?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() ?? '';
 }
 
-function formatDistanceFromMeters(distanceMeters?: number) {
+export function formatDistanceFromMeters(distanceMeters?: number) {
   if (!Number.isFinite(distanceMeters) || !distanceMeters || distanceMeters <= 0) return '';
   if (distanceMeters < 1000) return `${Math.round(distanceMeters)} m`;
 
   const kilometers = distanceMeters / 1000;
   const maximumFractionDigits = kilometers >= 10 ? 0 : 1;
   return `${new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(kilometers)} km`;
+}
+
+function formatWalkingText(durationText?: string, distanceText?: string) {
+  return [durationText, distanceText].filter(Boolean).join(' · ');
 }
 
 function formatDurationFromMillis(durationMillis?: number | null) {
@@ -344,7 +349,7 @@ function buildRouteTransfers(
 
         transfers.push({
           type: 'WALK',
-          title: `도보 ${segment.durationText}`,
+          title: `도보 ${formatWalkingText(segment.durationText, segment.distanceText)}`,
           detail: detail || segment.summary,
         });
         skipNextTransfer = true;
@@ -385,6 +390,19 @@ function getWalkingDurationText(
     .reduce((sum, segment) => sum + segment.durationValue, 0);
 
   return walkingMillis > 0 ? formatDurationFromMillis(walkingMillis) : undefined;
+}
+
+function getWalkingDistanceText(
+  routeMode: TravelModeKey,
+  segments: SavedRouteSegment[]
+) {
+  if (routeMode !== 'TRANSIT') return undefined;
+
+  const walkingMeters = segments
+    .filter((segment) => segment.mode === 'WALKING')
+    .reduce((sum, segment) => sum + segment.distanceValue, 0);
+
+  return walkingMeters > 0 ? formatDistanceFromMeters(walkingMeters) : undefined;
 }
 
 function getTransferCount(
@@ -460,6 +478,7 @@ function toRouteOption(
     arrivalText,
     transferCount: getTransferCount(mode, segments),
     walkingDurationText: getWalkingDurationText(mode, segments),
+    walkingDistanceText: getWalkingDistanceText(mode, segments),
     transitLines,
     path,
     segments,

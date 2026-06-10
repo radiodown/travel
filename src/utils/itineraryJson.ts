@@ -239,6 +239,7 @@ function parseRoute(value: unknown): SavedRoute | undefined {
   if (isString(value.departureText)) route.departureText = value.departureText;
   if (isString(value.arrivalText)) route.arrivalText = value.arrivalText;
   if (isString(value.walkingDurationText)) route.walkingDurationText = value.walkingDurationText;
+  if (isString(value.walkingDistanceText)) route.walkingDistanceText = value.walkingDistanceText;
   if (isString(value.requestedDepartureTime)) route.requestedDepartureTime = value.requestedDepartureTime;
   if (
     isString(value.transitPreference) &&
@@ -362,7 +363,6 @@ function parseDay(value: unknown): ItineraryDay | null {
     events,
   };
 
-  if (isString(value.mapHint)) day.mapHint = value.mapHint;
   if (isString(value.city)) day.city = value.city;
   if (isCoordinatePair(value.cityCoordinates)) day.cityCoordinates = value.cityCoordinates;
 

@@ -35,11 +35,14 @@ function getTransferLabel(option: RouteOption) {
   return option.transferCount > 0 ? `환승 ${option.transferCount}회` : '직행';
 }
 
+function getWalkingLabel(option: RouteOption) {
+  const walking = [option.walkingDurationText, option.walkingDistanceText].filter(Boolean).join(' · ');
+  return walking ? `도보 ${walking}` : null;
+}
+
 function getMetaLabels(option: RouteOption) {
   const labels = [getTransferLabel(option)];
-  if (option.walkingDurationText) {
-    labels.push(`도보 ${option.walkingDurationText}`);
-  }
+  labels.push(getWalkingLabel(option));
   if (option.departureText && option.arrivalText) {
     labels.push(`${option.departureText} - ${option.arrivalText}`);
   }

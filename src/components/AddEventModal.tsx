@@ -346,12 +346,6 @@ export default function AddEventModal({
       const airline = flightAirline.trim();
       const number = flightNumber.trim();
       const generatedTitle = [airline, number].filter(Boolean).join(' ') || '항공 이동';
-      const generatedDescription = [
-        flightDuration.trim() ? `소요 ${flightDuration.trim()}` : null,
-        flightArrivalTime.trim() ? `도착 ${flightArrivalTime.trim()}` : null,
-      ]
-        .filter(Boolean)
-        .join(' · ');
 
       const event: ItineraryEvent = {
         title: generatedTitle,
