@@ -29,6 +29,14 @@ type Props = {
 const MIN_WIDTH = 280;
 const MAX_WIDTH = 620;
 const MAP_CLEAN_MODE_STORAGE_KEY = 'travel-map-clean-mode';
+const ALL_DAYS_INDEX = -1;
+const EMPTY_DAY: ItineraryDay = {
+  day: '',
+  title: '',
+  date: '',
+  summary: '',
+  events: [],
+};
 
 type TransferMessage = {
   kind: 'success' | 'error';
@@ -37,6 +45,14 @@ type TransferMessage = {
 
 type ToastMotion = 'default' | 'next' | 'prev';
 type CategoryFilter = EventCategory | 'all';
+
+type DisplayEventEntry = {
+  event: ItineraryEvent;
+  index: number;
+  dayIndex: number;
+  day: ItineraryDay;
+  eventIndex: number;
+};
 
 type EventContextRouteAction = {
   label: '경로 추가' | '경로 다시 찾기';
@@ -86,6 +102,13 @@ function getRoundedTimeValue(date = new Date()) {
 
 function getInitialRouteDepartureTime(event?: ItineraryEvent) {
   return event?.time && /^\d{2}:\d{2}$/.test(event.time) ? event.time : getRoundedTimeValue();
+}
+
+function getDateRangeLabel(days: ItineraryDay[]) {
+  const firstDate = days[0]?.date;
+  const lastDate = days[days.length - 1]?.date;
+  if (!firstDate) return '';
+  return lastDate && lastDate !== firstDate ? `${firstDate} - ${lastDate}` : firstDate;
 }
 
 function toLocalDateTime(date: string, time: string) {
@@ -328,8 +351,47 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const touchDragging = useRef(false);
   const suppressSidebarClick = useRef(false);
   const pendingMovedEventSelection = useRef<{ dayIndex: number; eventIndex: number } | null>(null);
-  const day = days[selectedDayIndex];
-  const editingEvent = editingEventIndex !== null ? day.events[editingEventIndex] : null;
+  const isAllDays = selectedDayIndex === ALL_DAYS_INDEX;
+  const activeDay = days[selectedDayIndex] ?? days[0] ?? EMPTY_DAY;
+  const displayEventEntries = useMemo<DisplayEventEntry[]>(() => {
+    if (isAllDays) {
+      const entries: DisplayEventEntry[] = [];
+      days.forEach((entryDay, dayIndex) => {
+        entryDay.events.forEach((event, eventIndex) => {
+          entries.push({
+            event,
+            index: entries.length,
+            dayIndex,
+            day: entryDay,
+            eventIndex,
+          });
+        });
+      });
+      return entries;
+    }
+
+    return (activeDay?.events ?? []).map((event, eventIndex) => ({
+      event,
+      index: eventIndex,
+      dayIndex: selectedDayIndex,
+      day: activeDay,
+      eventIndex,
+    }));
+  }, [activeDay, days, isAllDays, selectedDayIndex]);
+  const displayEvents = useMemo(
+    () => displayEventEntries.map(({ event }) => event),
+    [displayEventEntries]
+  );
+  const day: ItineraryDay = isAllDays
+    ? {
+        day: '전체',
+        title: '모든 일정',
+        date: getDateRangeLabel(days),
+        summary: '전체 일정',
+        events: displayEvents,
+      }
+    : activeDay;
+  const editingEvent = !isAllDays && editingEventIndex !== null ? day.events[editingEventIndex] : null;
   const daysWeather = useDaysWeather(days);
   const categoryCounts = useMemo(() => {
     const counts = new Map<EventCategory, number>();
@@ -344,11 +406,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     [categoryCounts]
   );
   const visibleEventEntries = useMemo(
-    () =>
-      day.events
-        .map((event, index) => ({ event, index }))
-        .filter(({ event }) => categoryFilter === 'all' || event.category === categoryFilter),
-    [categoryFilter, day.events]
+    () => displayEventEntries.filter(({ event }) => categoryFilter === 'all' || event.category === categoryFilter),
+    [categoryFilter, displayEventEntries]
   );
   const visibleEventIndexSet = useMemo(
     () => new Set(visibleEventEntries.map(({ index }) => index)),
@@ -391,7 +450,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   }, [selectEvent, selectedEventIndex, visibleEventIndexSet]);
 
   useEffect(() => {
-    if (!routePicker) return;
+    if (!routePicker || isAllDays) return;
 
     const snapshot = {
       originIndex: routePicker.originIndex,
@@ -454,6 +513,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     };
   }, [
     day.date,
+    isAllDays,
     routePicker?.departureTime,
     routePicker?.destinationCoordinates,
     routePicker?.destinationIndex,
@@ -610,6 +670,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   );
 
   const handleSaveEvent = (event: ItineraryEvent) => {
+    if (isAllDays) return;
+
     setDays((prev) =>
       prev.map((currentDay, index) =>
         index === selectedDayIndex
@@ -634,12 +696,14 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   };
 
   const openAddModal = () => {
+    if (isAllDays) return;
     setEditingEventIndex(null);
     setDraftEvent(null);
     setShowEventModal(true);
   };
 
   const openEditModal = (eventIndex: number) => {
+    if (isAllDays) return;
     const event = day.events[eventIndex];
 
     if (event && isRouteEvent(event)) {
@@ -668,6 +732,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   };
 
   const handleAddLocationFromMap = (event: ItineraryEvent) => {
+    if (isAllDays) return;
     selectEvent(null);
     setDraftEvent(event);
     setEditingEventIndex(null);
@@ -675,6 +740,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   };
 
   const handleRouteDraftRequest = (request: RouteDraftRequest) => {
+    if (isAllDays) return;
     setShowEventModal(false);
     setEditingEventIndex(null);
     setDraftEvent(null);
@@ -686,6 +752,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   };
 
   const openDayTitleEditor = () => {
+    if (isAllDays) return;
     setDayTitleDraft(day.title);
     setCityDraft(day.city ?? '');
     setEditingDayTitle(true);
@@ -698,6 +765,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   };
 
   const saveDayTitle = async () => {
+    if (isAllDays) return;
+
     const nextTitle = dayTitleDraft.trim();
     if (!nextTitle) {
       cancelDayTitleEdit();
@@ -791,6 +860,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   };
 
   const handleDeleteEvent = (eventIndex: number) => {
+    if (isAllDays) return;
+
     setDays((prev) =>
       prev.map((currentDay, index) =>
         index === selectedDayIndex
@@ -844,7 +915,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   };
 
   const handleSelectRoute = (option: RouteOption) => {
-    if (!routePicker) return;
+    if (!routePicker || isAllDays) return;
 
     const insertAt = routePicker.replaceIndex ?? routePicker.originIndex + 1;
 
@@ -911,6 +982,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   };
 
   const handleReorder = useCallback((from: number, to: number) => {
+    if (isAllDays) return;
     if (from === to) return;
     setDays((prev) =>
       prev.map((currentDay, index) => {
@@ -922,7 +994,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
       })
     );
     selectEvent(null);
-  }, [selectEvent, selectedDayIndex, setDays]);
+  }, [isAllDays, selectEvent, selectedDayIndex, setDays]);
 
   const handleDrop = (to: number) => {
     if (dragIndex !== null) handleReorder(dragIndex, to);
@@ -1010,6 +1082,8 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
 
   const openEventContextMenu = useCallback(
     (eventIndex: number, x: number, y: number) => {
+      if (isAllDays) return;
+
       const event = day.events[eventIndex];
       if (!event) return;
 
@@ -1040,7 +1114,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
         routeAction,
       });
     },
-    [clampContextMenuPosition, day.events, getRouteDraftFromListIndex]
+    [clampContextMenuPosition, day.events, getRouteDraftFromListIndex, isAllDays]
   );
 
   const handleContextRouteAction = () => {
@@ -1070,7 +1144,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   };
 
   const handleMoveEventToDay = (targetDayIndex: number) => {
-    if (!contextMenu || targetDayIndex === selectedDayIndex) return;
+    if (isAllDays || !contextMenu || targetDayIndex === selectedDayIndex) return;
 
     const eventToMove = day.events[contextMenu.eventIndex];
     const targetDay = days[targetDayIndex];
@@ -1152,6 +1226,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   };
 
   const startLongPress = () => {
+    if (isAllDays) return;
     longPressFired.current = false;
     clearLongPress();
     longPressTimer.current = window.setTimeout(() => {
@@ -1196,6 +1271,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   };
 
   const startEventLongPress = (eventIndex: number, x: number, y: number) => {
+    if (isAllDays) return;
     eventLongPressFired.current = false;
     eventTouchStartPoint.current = { x, y };
     clearEventLongPress();
@@ -1291,6 +1367,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   }, [dragIndex, findSidebarEventIndexAtPoint, finishTouchDrag]);
 
   const handleTouchDragStart = (e: React.TouchEvent, index: number) => {
+    if (isAllDays) return;
     if (e.touches.length !== 1) return;
     e.preventDefault();
     e.stopPropagation();
@@ -1322,16 +1399,18 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
 
   const mapNumbers: Record<number, number> = {};
   let counter = 1;
-  day.events.forEach((event, index) => {
+  displayEventEntries.forEach(({ event, index }) => {
     if (visibleEventIndexSet.has(index) && event.coordinates && !isRouteEvent(event)) {
       mapNumbers[index] = counter;
       counter += 1;
     }
   });
-  const contextMoveTargets = days.flatMap((candidateDay, index) =>
-    index === selectedDayIndex ? [] : [{ index, day: candidateDay }]
-  );
-  const reservationItems = getDayReservationItems(day);
+  const contextMoveTargets = isAllDays
+    ? []
+    : days.flatMap((candidateDay, index) =>
+        index === selectedDayIndex ? [] : [{ index, day: candidateDay }]
+      );
+  const reservationItems = isAllDays ? [] : getDayReservationItems(day);
 
   return (
     <div className="schedule-page">
@@ -1341,13 +1420,14 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           selectedIndex={selectedEventIndex}
           onSelectEvent={(index) => selectEvent(selectedEventIndex === index ? null : index)}
           cleanMode={cleanMapMode}
-          onAddLocation={handleAddLocationFromMap}
+          onAddLocation={isAllDays ? undefined : handleAddLocationFromMap}
           visibleOffsetX={visibleOffsetX}
           visibleEventIndexes={visibleEventIndexSet}
         />
 
         {selectedEventIndex !== null && day.events[selectedEventIndex] && (() => {
           const event = day.events[selectedEventIndex];
+          const selectedEntry = displayEventEntries[selectedEventIndex];
           const category = event.category ? CATEGORIES[event.category] : null;
           const eventDescription = getEventDescription(event.description, event.note);
           const isRoute = isRouteEvent(event);
@@ -1372,6 +1452,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
             >
               <div className="map-toast-body">
                 <div className="map-toast-top">
+                  {isAllDays && selectedEntry && <span className="map-toast-day">{selectedEntry.day.day}</span>}
                   {category && (
                     <span
                       className="map-toast-cat"
@@ -1459,15 +1540,17 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
             <span className="schedule-map-mode-label">Map</span>
             <span className="schedule-map-mode-value">{cleanMapMode ? 'Clean' : 'Default'}</span>
           </button>
-          <button
-            className="schedule-icon-btn schedule-add-btn"
-            onClick={openAddModal}
-            title="일정 추가"
-            aria-label="일정 추가"
-            type="button"
-          >
-            ＋
-          </button>
+          {!isAllDays && (
+            <button
+              className="schedule-icon-btn schedule-add-btn"
+              onClick={openAddModal}
+              title="일정 추가"
+              aria-label="일정 추가"
+              type="button"
+            >
+              ＋
+            </button>
+          )}
           <button
             className="schedule-icon-btn"
             onClick={handleExportJson}
@@ -1512,6 +1595,13 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
         >
           <div className="sidebar-tabs-wrap">
             <div className="sidebar-tabs" ref={tabsRef}>
+              <button
+                className={`day-chip all-days-chip${isAllDays ? ' active' : ''}`}
+                onClick={() => onSelectDay(ALL_DAYS_INDEX)}
+                type="button"
+              >
+                전체
+              </button>
               {days.map((item, index) => (
                 <button
                   key={item.day}
@@ -1528,7 +1618,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           <div className="sidebar-day-header">
             <div className="sidebar-day-label-row">
               <p className="sidebar-day-label">{day.day}</p>
-              {daysWeather[selectedDayIndex] && (
+              {!isAllDays && daysWeather[selectedDayIndex] && (
                 <span className="day-weather" aria-hidden="true">
                   <span
                     className="dw-half"
@@ -1552,7 +1642,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
               )}
             </div>
             <div className="sidebar-day-title-row">
-              {editingDayTitle ? (
+              {!isAllDays && editingDayTitle ? (
                 <div className="sidebar-day-edit">
                   <div className="sidebar-day-edit-fields">
                     <input
@@ -1612,14 +1702,16 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
               ) : (
                 <>
                   <h2 className="sidebar-day-title">{day.title}</h2>
-                  <button
-                    className="sidebar-day-title-edit"
-                    onClick={openDayTitleEditor}
-                    title="일자 제목 수정"
-                    type="button"
-                  >
-                    ✎
-                  </button>
+                  {!isAllDays && (
+                    <button
+                      className="sidebar-day-title-edit"
+                      onClick={openDayTitleEditor}
+                      title="일자 제목 수정"
+                      type="button"
+                    >
+                      ✎
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -1686,7 +1778,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
           )}
 
           <ul className="sidebar-event-list">
-            {visibleEventEntries.map(({ event, index }) => {
+            {visibleEventEntries.map(({ event, index, day: entryDay }) => {
               const num = mapNumbers[index];
               const active = selectedEventIndex === index;
               const clickable = isSelectableEvent(event);
@@ -1703,18 +1795,18 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                   key={`${event.title}-${index}`}
                   data-event-index={index}
                   className={
-                    `sidebar-event${active ? ' active' : ''}${clickable ? ' clickable' : ''}` +
+                    `sidebar-event${active ? ' active' : ''}${clickable ? ' clickable' : ''}${isAllDays ? ' all-days-event' : ''}` +
                     `${dragIndex === index ? ' dragging' : ''}${overIndex === index && dragIndex !== index ? ' drag-over' : ''}`
                   }
                   onClick={() => handleSidebarEventClick(index, active, clickable)}
-                  onContextMenu={(e) => handleEventContextMenu(e, index)}
-                  onTouchStart={(e) => handleSidebarEventTouchStart(e, index)}
+                  onContextMenu={isAllDays ? undefined : (e) => handleEventContextMenu(e, index)}
+                  onTouchStart={isAllDays ? undefined : (e) => handleSidebarEventTouchStart(e, index)}
                   onTouchMove={handleSidebarEventTouchMove}
                   onTouchEnd={handleSidebarEventTouchEnd}
                   onTouchCancel={handleSidebarEventTouchEnd}
-                  draggable={!isNarrow}
+                  draggable={!isAllDays && !isNarrow}
                   onDragStart={() => {
-                    if (!isNarrow) setDragIndex(index);
+                    if (!isAllDays && !isNarrow) setDragIndex(index);
                   }}
                   onDragEnter={() => setOverIndex(index)}
                   onDragOver={(e) => e.preventDefault()}
@@ -1733,6 +1825,7 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
                   <div className={`ev-num${num ? '' : ' ev-num--none'}`}>{num ?? '·'}</div>
                   <div className="ev-info">
                     <div className="ev-meta-row">
+                      {isAllDays && <span className="ev-day-chip">{entryDay.day}</span>}
                       {event.time && !isFlightMovement && <span className="ev-time">{event.time}</span>}
                       {event.category && (
                         <span
@@ -1824,9 +1917,11 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
             })}
           </ul>
 
-          <button className="add-event-btn" onClick={openAddModal} type="button">
-            ＋ 일정 추가
-          </button>
+          {!isAllDays && (
+            <button className="add-event-btn" onClick={openAddModal} type="button">
+              ＋ 일정 추가
+            </button>
+          )}
 
           {!!reservationItems.length && (
             <div className="sidebar-res">

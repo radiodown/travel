@@ -557,6 +557,15 @@
   border-radius: 999px;
 }
 
+.map-toast-day {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.1);
+}
+
 .map-toast-time {
   font-size: 0.7rem;
   font-weight: 700;

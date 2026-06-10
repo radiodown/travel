@@ -641,6 +641,11 @@
   box-shadow: inset 0 2px 0 0 var(--accent);
 }
 
+.sidebar-event.all-days-event .ev-drag,
+.sidebar-event.all-days-event .ev-actions {
+  display: none;
+}
+
 .ev-drag {
   align-self: center;
   color: #cbd5e1;
@@ -906,6 +911,19 @@
   background: var(--accent-tint);
   padding: 2px 7px;
   border-radius: 999px;
+}
+
+.ev-day-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 21px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.1);
+  color: #0f766e;
+  font-size: 0.67rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .ev-cat {

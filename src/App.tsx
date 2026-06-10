@@ -7,6 +7,7 @@ import { parseItineraryJson, serializeItinerary } from './utils/itineraryJson';
 type Page = 'main' | 'schedule';
 
 const ITINERARY_STORAGE_KEY = 'travel-itinerary-days';
+const ALL_DAYS_INDEX = -1;
 
 function getInitialDays() {
   if (typeof window === 'undefined') {
@@ -93,6 +94,11 @@ function App() {
 
   useEffect(() => {
     if (days.length === 0) {
+      setSelectedDayIndex(0);
+      return;
+    }
+
+    if (selectedDayIndex < ALL_DAYS_INDEX) {
       setSelectedDayIndex(0);
       return;
     }
