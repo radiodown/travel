@@ -337,7 +337,9 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<EventContextMenu | null>(null);
   const [routePicker, setRoutePicker] = useState<RoutePickerState | null>(null);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const tabsRef = useRef<HTMLDivElement>(null);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const transferMessageTimeoutRef = useRef<number | null>(null);
   const toastTouchStartX = useRef<number | null>(null);
@@ -576,6 +578,27 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(MAP_CLEAN_MODE_STORAGE_KEY, String(cleanMapMode));
   }, [cleanMapMode]);
+
+  useEffect(() => {
+    if (!showSettingsMenu) return;
+
+    const onPointerDown = (e: MouseEvent) => {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node)) {
+        setShowSettingsMenu(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowSettingsMenu(false);
+    };
+
+    window.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      window.removeEventListener('mousedown', onPointerDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showSettingsMenu]);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 860px)');
@@ -857,6 +880,28 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
     } finally {
       e.target.value = '';
     }
+  };
+
+  const handleResetData = () => {
+    setShowSettingsMenu(false);
+
+    const confirmed = window.confirm(
+      '저장된 모든 일정 데이터를 삭제하고 기본 셋팅 데이터로 되돌립니다. 계속하시겠습니까?'
+    );
+    if (!confirmed) return;
+
+    try {
+      for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+        const key = window.localStorage.key(index);
+        if (key && key.startsWith('travel-')) {
+          window.localStorage.removeItem(key);
+        }
+      }
+    } catch {
+      // localStorage 접근이 막혀 있어도 새로고침으로 기본 데이터를 복원한다.
+    }
+
+    window.location.reload();
   };
 
   const handleDeleteEvent = (eventIndex: number) => {
@@ -1551,33 +1596,69 @@ export default function SchedulePage({ days, setDays, selectedDayIndex, onSelect
               ＋
             </button>
           )}
-          <button
-            className="schedule-icon-btn"
-            onClick={handleExportJson}
-            title="JSON 내보내기"
-            aria-label="JSON 내보내기"
-            type="button"
-          >
-            ⤓
-          </button>
-          <button
-            className="schedule-icon-btn"
-            onClick={openImportJson}
-            title="JSON 불러오기"
-            aria-label="JSON 불러오기"
-            type="button"
-          >
-            ⤒
-          </button>
-          <button
-            className="schedule-icon-btn"
-            onClick={onBack}
-            title="메인으로"
-            aria-label="메인으로"
-            type="button"
-          >
-            ←
-          </button>
+          <div className="schedule-settings" ref={settingsMenuRef}>
+            <button
+              className={`schedule-icon-btn schedule-settings-btn${showSettingsMenu ? ' is-active' : ''}`}
+              onClick={() => setShowSettingsMenu((prev) => !prev)}
+              title="설정"
+              aria-label="설정"
+              aria-haspopup="true"
+              aria-expanded={showSettingsMenu}
+              type="button"
+            >
+              ⚙
+            </button>
+            {showSettingsMenu && (
+              <div className="schedule-settings-menu" role="menu">
+                <button
+                  className="schedule-settings-item"
+                  onClick={() => {
+                    setShowSettingsMenu(false);
+                    handleExportJson();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <span className="schedule-settings-item-icon">⤓</span>
+                  JSON 내보내기
+                </button>
+                <button
+                  className="schedule-settings-item"
+                  onClick={() => {
+                    setShowSettingsMenu(false);
+                    openImportJson();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <span className="schedule-settings-item-icon">⤒</span>
+                  JSON 불러오기
+                </button>
+                <button
+                  className="schedule-settings-item"
+                  onClick={() => {
+                    setShowSettingsMenu(false);
+                    onBack();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <span className="schedule-settings-item-icon">←</span>
+                  메인으로
+                </button>
+                <div className="schedule-settings-divider" />
+                <button
+                  className="schedule-settings-item schedule-settings-item-danger"
+                  onClick={handleResetData}
+                  role="menuitem"
+                  type="button"
+                >
+                  <span className="schedule-settings-item-icon">↺</span>
+                  데이터 초기화
+                </button>
+              </div>
+            )}
+          </div>
           <input
             ref={importInputRef}
             type="file"
