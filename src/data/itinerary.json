@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exportedAt": "2026-06-11T13:47:50.087Z",
+  "exportedAt": "2026-06-12T03:42:14.302Z",
   "days": [
     {
       "day": "1일차",
@@ -6588,6 +6588,26 @@
             14.398813
           ],
           "category": "sightseeing"
+        },
+        {
+          "title": "St. Nicholas Church (Malá Strana)",
+          "category": "sightseeing",
+          "time": "12:20",
+          "location": "Malostranské nám., 118 00 Praha 1-Malá Strana, 체코",
+          "coordinates": [
+            50.088027,
+            14.40347
+          ]
+        },
+        {
+          "title": "레넌 벽",
+          "category": "sightseeing",
+          "time": "12:20",
+          "location": "Velkopřevorské nám., Malá Strana, 118 00 Praha-Praha 1, 체코",
+          "coordinates": [
+            50.086251,
+            14.406792
+          ]
         }
       ]
     },
@@ -6598,22 +6618,14 @@
       "summary": "프라하 골목과 카페를 느긋하게 즐기는 일정.",
       "events": [
         {
-          "title": "구시가지 광장",
-          "description": "천문시계, 틴 성당 주변 산책",
+          "title": "그란디오르 호텔",
+          "category": "stay",
+          "time": "12:30",
+          "location": "Na Poříčí 1052/42, 110 00 Praha 1-Florenc, 체코",
           "coordinates": [
-            50.0875,
-            14.4213
-          ],
-          "category": "sightseeing"
-        },
-        {
-          "title": "카를교",
-          "description": "카를교 보행 및 블타바 강 경관 감상",
-          "coordinates": [
-            50.0865,
-            14.4114
-          ],
-          "category": "sightseeing"
+            50.090086,
+            14.436036
+          ]
         },
         {
           "title": "⭐ 나세마소 (Naše maso)",
@@ -6757,6 +6769,76 @@
             14.421417
           ],
           "category": "food"
+        },
+        {
+          "title": "화약탑",
+          "category": "sightseeing",
+          "time": "12:20",
+          "location": "Nám. Republiky 5, 110 00 Praha 1-Staré Město, 체코",
+          "coordinates": [
+            50.087273,
+            14.427789
+          ]
+        },
+        {
+          "title": "구시가 광장",
+          "category": "sightseeing",
+          "time": "12:25",
+          "location": "Staroměstské nám., 110 00 Praha 1-Staré Město, 체코",
+          "coordinates": [
+            50.087569,
+            14.421187
+          ]
+        },
+        {
+          "title": "프라하 천문 시계",
+          "category": "sightseeing",
+          "time": "12:25",
+          "location": "Staroměstské nám. 1, 110 00 Praha 1-Staré Město, 체코",
+          "coordinates": [
+            50.087021,
+            14.420707
+          ]
+        },
+        {
+          "title": "프란츠 카프카 생가",
+          "category": "sightseeing",
+          "time": "12:25",
+          "location": "Nám. Franze Kafky 1, Staré Město, 110 00 Praha-Praha 1, 체코",
+          "coordinates": [
+            50.087984,
+            14.419234
+          ]
+        },
+        {
+          "title": "하벨시장",
+          "category": "sightseeing",
+          "time": "12:25",
+          "location": "Havelská 13, 110 00 Praha 1-Staré Město, 체코",
+          "coordinates": [
+            50.084775,
+            14.420961
+          ]
+        },
+        {
+          "title": "베드르지흐 스메타나 박물관",
+          "category": "sightseeing",
+          "time": "12:25",
+          "location": "1, Novotného lávka 201, 110 00 Praha 1-Staré Město, 체코",
+          "coordinates": [
+            50.085545,
+            14.412935
+          ]
+        },
+        {
+          "title": "국립박물관",
+          "category": "sightseeing",
+          "time": "12:30",
+          "location": "Václavské nám. 68, 110 00 Praha 1-Nové Město, 체코",
+          "coordinates": [
+            50.07897,
+            14.430937
+          ]
         }
       ]
     },
@@ -6767,13 +6849,104 @@
       "summary": "프라하 박물관 혹은 쇼핑, 자유 일정을 즐길 수 있는 날.",
       "events": [
         {
-          "title": "프라하 자유 일정",
-          "description": "리버 크루즈, 쇼핑, 또는 미술관 선택",
+          "title": "스트라호프 수도원",
+          "category": "sightseeing",
+          "time": "12:25",
+          "location": "Strahovské nádvoří 1/132, 118 00 Praha 1-Strahov, 체코",
           "coordinates": [
-            50.0755,
-            14.4378
-          ],
-          "category": "etc"
+            50.086148,
+            14.389252
+          ]
+        },
+        {
+          "title": "Petrin Hill",
+          "category": "sightseeing",
+          "time": "12:30",
+          "location": "Petřínské sady 1, 118 00 Praha 1-Strahov, 체코",
+          "coordinates": [
+            50.081543,
+            14.396921
+          ]
+        },
+        {
+          "title": "Trdelník & Coffee",
+          "category": "food",
+          "time": "12:35",
+          "location": "Josefov CZ, U Starého Hřbitova 42/2, Staré Město, 110 00 Praha-Praha 1, 체코",
+          "coordinates": [
+            50.090041,
+            14.418064
+          ]
+        },
+        {
+          "title": "Ali Baba Kebap",
+          "category": "food",
+          "time": "12:35",
+          "location": "11, Na Poříčí 1918, Nové Město, 110 00 Praha-Praha 1, 체코",
+          "coordinates": [
+            50.089671,
+            14.432198
+          ]
+        },
+        {
+          "title": "Prokop, coffee & croissants",
+          "category": "food",
+          "time": "12:35",
+          "location": "Dlážděná 4, Nové Město, 110 00 Praha-Praha 1, 체코",
+          "coordinates": [
+            50.086584,
+            14.432321
+          ]
+        },
+        {
+          "title": "코젤로브나",
+          "category": "food",
+          "time": "12:35",
+          "location": "Křižovnická 4, 110 00 Praha 1-Staré Město, 체코",
+          "coordinates": [
+            50.08735,
+            14.415248
+          ]
+        },
+        {
+          "title": "코즐로브나 우 파우케르타",
+          "category": "food",
+          "time": "12:35",
+          "location": "Národní 981/17, 110 00 Praha 1-Staré Město, 체코",
+          "coordinates": [
+            50.081992,
+            14.417003
+          ]
+        },
+        {
+          "title": "The Beer Spot Prague",
+          "category": "food",
+          "time": "12:35",
+          "location": "Plaská 623/5, Malá Strana, 150 00 Praha-Praha 5, 체코",
+          "coordinates": [
+            50.080517,
+            14.405864
+          ]
+        },
+        {
+          "title": "Pork's Mostecka",
+          "category": "food",
+          "time": "12:35",
+          "location": "Mostecká 16, Malá Strana, 110 00 Praha-Praha 1, 체코",
+          "coordinates": [
+            50.087507,
+            14.406057
+          ]
+        },
+        {
+          "title": "Strahov Monastery Brewery",
+          "category": "food",
+          "time": "12:40",
+          "location": "Strahovské nádvoří 301, 118 00 Praha 1-Hradčany, 체코",
+          "coordinates": [
+            50.086854,
+            14.388361
+          ]
         }
       ]
     },
@@ -7522,6 +7695,56 @@
           "coordinates": [
             48.810676,
             14.315128
+          ]
+        },
+        {
+          "title": "Kafemlejnek",
+          "category": "food",
+          "time": "12:40",
+          "location": "Latrán 6, Latrán, 381 01 Český Krumlov-Český Krumlov 1, 체코",
+          "coordinates": [
+            48.811871,
+            14.316114
+          ]
+        },
+        {
+          "title": "파파스 리빙",
+          "category": "food",
+          "time": "12:40",
+          "location": "Latrán 13, 381 01 Český Krumlov-Český Krumlov 1, 체코",
+          "coordinates": [
+            48.811897,
+            14.316744
+          ]
+        },
+        {
+          "title": "FAJR 99",
+          "category": "food",
+          "time": "12:40",
+          "location": "věžní 99, 381 01 Český Krumlov-Český Krumlov 1, 체코",
+          "coordinates": [
+            48.814769,
+            14.317272
+          ]
+        },
+        {
+          "title": "Travellers restaurant",
+          "category": "food",
+          "time": "12:40",
+          "location": "Soukenická 43, Vnitřní Město, 381 01 Český Krumlov-Český Krumlov 1, 체코",
+          "coordinates": [
+            48.811356,
+            14.314241
+          ]
+        },
+        {
+          "title": "Krčma Šatlava",
+          "category": "food",
+          "time": "12:40",
+          "location": "Šatlavská 157, 381 01 Český Krumlov-Český Krumlov 1, 체코",
+          "coordinates": [
+            48.810692,
+            14.315907
           ]
         }
       ]
